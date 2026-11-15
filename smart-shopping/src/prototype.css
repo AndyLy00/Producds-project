@@ -132,6 +132,9 @@
 }
 .list-heading-row::after { position: absolute; z-index: 0; top: -27px; right: -20px; width: 92px; height: 86px; background: url("/assets/app/tomatoes.png") center / contain no-repeat; content: ""; opacity: 0.62; pointer-events: none; }
 .list-heading-row > * { position: relative; z-index: 1; }
+/* The decorative PNGs have an opaque cream background; fade their edges into the paper. */
+.list-heading-row::after,
+.welcome-block::after { -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); }
 .list-screen { position: relative; }
 .list-screen::before { position: absolute; z-index: 0; bottom: 12px; left: -38px; width: 120px; height: 105px; background: url("/assets/app/leaf-sprig.png") center / contain no-repeat; content: ""; opacity: 0.24; pointer-events: none; }
 
@@ -163,6 +166,7 @@
 .check-button.checked { border-color: var(--green); background: var(--green); }
 .product-art { width: 40px; height: 42px; flex: 0 0 auto; border-radius: 11px; object-fit: contain; mix-blend-mode: multiply; }
 .theme-dark .product-art { mix-blend-mode: normal; }
+.product-art-placeholder { display: grid; place-items: center; background: var(--green-soft); color: var(--green); font-size: 16px; font-weight: 700; mix-blend-mode: normal; }
 .product-main { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding: 8px 0; border: 0; background: transparent; color: var(--ink); text-align: left; }
 .product-name { overflow: hidden; max-width: 100%; font-size: 15px; font-weight: 660; letter-spacing: -0.25px; text-overflow: ellipsis; white-space: nowrap; }
 .product-note { overflow: hidden; max-width: 100%; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
@@ -262,7 +266,7 @@
 .favorite-star svg,
 .history-icon svg { width: 16px; height: 16px; }
 .history-icon { color: var(--green); }
-.favorite-row > span:nth-child(2),
+.favorite-row-main > span:nth-child(2),
 .history-row > span:nth-child(2) { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
 .favorite-row b,
 .history-row b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }

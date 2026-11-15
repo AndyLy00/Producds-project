@@ -26,6 +26,26 @@ npm ci
 npm run dev
 ```
 
+## Android-приложение
+
+Тот же интерфейс упакован в Android-приложение через [Capacitor](https://capacitorjs.com/). Проект Android Studio лежит в `android/`.
+
+Нужны JDK 21 (полный, с `jlink`) и Android SDK с платформой 36; путь к ним задаётся переменными `JAVA_HOME` и `ANDROID_HOME`.
+
+```bash
+npm ci
+npm run apk          # веб-сборка + cap sync + gradlew assembleDebug
+```
+
+Готовый файл: `android/app/build/outputs/apk/debug/app-debug.apk`. Это отладочная сборка; для публикации в Google Play нужна подписанная release-сборка.
+
+Как это устроено:
+
+- `vite.android.config.ts` собирает отдельный бандл в `dist/android` с точкой входа `src/native/main.tsx` — без рамки телефона и нарисованной клавиатуры, которые нужны только прототипу в браузере.
+- `src/native/index.tsx` реализует ту часть API `src/mobile`, которой пользуется приложение (`MobileScroll`, `BottomSheet`, `KeyboardInput`, `useKeyboard`, `useKeyboardInsets`), поверх настоящих прокрутки и клавиатуры. При Android-сборке импорт `./mobile` подменяется на этот модуль.
+- Системная кнопка «Назад» закрывает форму, затем возвращает к спискам и только потом закрывает приложение.
+- Иконки и заставка сгенерированы из `assets/logo.png` командой `npx @capacitor/assets generate --android`.
+
 ## Устройство данных
 
 Интерфейс работает через `ShoppingRepository`; первая реализация хранит снимок списков в IndexedDB. Позже можно добавить облачный репозиторий и синхронизацию, не связывая экраны напрямую с конкретным хранилищем.

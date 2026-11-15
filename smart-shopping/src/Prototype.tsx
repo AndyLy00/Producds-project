@@ -117,6 +117,20 @@ export default function Prototype() {
     return () => window.cancelAnimationFrame(frame);
   }, [sheetMode]);
 
+  // System back button in the Android app (dispatched from src/native/main.tsx).
+  // Leaving the event unhandled on the root screen lets the app close.
+  useEffect(() => {
+    const onBack = (event: Event) => {
+      if (sheetMode !== null) setSheetMode(null);
+      else if (currentListId !== null) setCurrentListId(null);
+      else if (tab !== "lists") setTab("lists");
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener("app:back", onBack);
+    return () => window.removeEventListener("app:back", onBack);
+  }, [sheetMode, currentListId, tab]);
+
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 2200);
