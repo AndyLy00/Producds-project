@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#faf7ee" />
+    <meta name="description" content="Удобные списки покупок, которые всегда под рукой." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/assets/app/icon-192.png" type="image/png" />
+    <title>Корзина — список покупок</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      if ("serviceWorker" in navigator) {
+        if (import.meta.env.PROD) {
+          window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+        } else {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            registrations.forEach((registration) => registration.unregister());
+          });
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
