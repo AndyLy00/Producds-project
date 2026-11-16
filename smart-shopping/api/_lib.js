@@ -73,9 +73,43 @@ let indexesReady;
 export async function database() {
   clientPromise ??= new MongoClient(requiredEnv("MONGODB_URI")).connect();
   const db = (await clientPromise).db(process.env.MONGODB_DB || "korzina");
-  indexesReady ??= db.collection("users").createIndex({ email: 1 }, { unique: true });
+  indexesReady ??= Promise.all([
+    db.collection("users").createIndex({ email: 1 }, { unique: true }),
+    // MongoDB removes attempt counters by itself once their window has passed.
+    db.collection("attempts").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+  ]);
   await indexesReady;
   return db;
+}
+
+// Brute-force protection. Attempts are counted per fixed time window in the "attempts"
+// collection, one counter per subject ("login:email:anna@example.com", "login:ip:203.0.113.7").
+function attemptCounter(subject, windowSeconds) {
+  const window = Math.floor(Date.now() / 1000 / windowSeconds);
+  return { _id: `${subject}:${window}`, expiresAt: new Date((window + 1) * windowSeconds * 1000) };
+}
+
+// Throws 429 when the subject has used up its attempts for the current window.
+export async function assertNotBlocked(subject, limit, windowSeconds) {
+  const { _id, expiresAt } = attemptCounter(subject, windowSeconds);
+  const counter = await (await database()).collection("attempts").findOne({ _id });
+  if ((counter?.count ?? 0) < limit) return;
+  const minutes = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
+  throw new HttpError(429, `Слишком много попыток. Попробуйте снова через ${minutes} мин.`);
+}
+
+export async function recordAttempt(subject, windowSeconds) {
+  const { _id, expiresAt } = attemptCounter(subject, windowSeconds);
+  await (await database()).collection("attempts").updateOne({ _id }, { $inc: { count: 1 }, $setOnInsert: { expiresAt } }, { upsert: true });
+}
+
+export async function clearAttempts(subject, windowSeconds) {
+  await (await database()).collection("attempts").deleteOne({ _id: attemptCounter(subject, windowSeconds)._id });
+}
+
+// Vercel sets x-real-ip itself, so a client cannot forge it there.
+export function clientAddress(request) {
+  return request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
 }
 
 export async function hashPassword(password, salt = randomBytes(16).toString("base64url")) {

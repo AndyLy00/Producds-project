@@ -1,7 +1,7 @@
 // Tests of the account API (api/*.js) against a real MongoDB.
 // MONGODB_URI must point at a disposable database; without it the tests are skipped.
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, before, beforeEach, test } from "node:test";
 
 const skip = process.env.MONGODB_URI ? false : "MONGODB_URI is not set";
 process.env.AUTH_SECRET ??= "test-secret";
@@ -28,16 +28,23 @@ after(async () => {
   await db.client.close();
 });
 
-async function call(handler, { method = "POST", token, body } = {}) {
+// Each test calls from its own address so that the per-address limits do not add up across tests.
+let address = 0;
+
+async function call(handler, { method = "POST", token, body, ip = `198.51.100.${address}` } = {}) {
   const response = await handler(
     new Request("https://example.test/api", {
       method,
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: { "x-real-ip": ip, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
   );
   return { status: response.status, body: await response.json() };
 }
+
+beforeEach(() => {
+  address += 1;
+});
 
 const lists = (name) => ({ lists: [{ id: "1", name, createdAt: 1, updatedAt: 1, items: [] }], history: [], darkMode: false });
 
@@ -91,4 +98,46 @@ test("lists are saved per account and a stale save is rejected with the stored c
   assert.deepEqual((await call(api.get, { method: "GET", token: gleb })).body, { version: 0, data: null });
 
   assert.equal((await call(api.put, { method: "PUT", token: vera, body: { baseVersion: 2, data: { lists: "nope" } } })).status, 400);
+});
+
+test("repeated wrong passwords lock the account for a while, even for the right password", { skip }, async () => {
+  const credentials = { email: "dasha@example.com", password: "correct-horse" };
+  await call(api.register, { body: credentials });
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    assert.equal((await call(api.login, { body: { ...credentials, password: `guess-number-${attempt}` } })).status, 401);
+  }
+  const blocked = await call(api.login, { body: { ...credentials, password: "guess-number-5" } });
+  assert.equal(blocked.status, 429);
+  assert.match(blocked.body.error, /Слишком много попыток/);
+  // Changing address does not help the attacker, and the correct password is not confirmed either.
+  assert.equal((await call(api.login, { body: credentials, ip: "203.0.113.50" })).status, 429);
+
+  // Other accounts are not affected.
+  await call(api.register, { body: { email: "egor@example.com", password: "long-enough" } });
+  assert.equal((await call(api.login, { body: { email: "egor@example.com", password: "long-enough" } })).status, 200);
+});
+
+test("a successful sign-in resets the count of wrong passwords", { skip }, async () => {
+  const credentials = { email: "zhenya@example.com", password: "correct-horse" };
+  await call(api.register, { body: credentials });
+  for (let round = 0; round < 3; round += 1) {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      assert.equal((await call(api.login, { body: { ...credentials, password: "wrong-horse" } })).status, 401);
+    }
+    assert.equal((await call(api.login, { body: credentials })).status, 200);
+  }
+});
+
+test("one address cannot try a password against many accounts or mass-register", { skip }, async () => {
+  const ip = "203.0.113.99";
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    assert.equal((await call(api.login, { ip, body: { email: `victim${attempt}@example.com`, password: "password123" } })).status, 401);
+  }
+  assert.equal((await call(api.login, { ip, body: { email: "victim30@example.com", password: "password123" } })).status, 429);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    assert.equal((await call(api.register, { ip, body: { email: `bulk${attempt}@example.com`, password: "long-enough" } })).status, 201);
+  }
+  assert.equal((await call(api.register, { ip, body: { email: "bulk10@example.com", password: "long-enough" } })).status, 429);
 });
