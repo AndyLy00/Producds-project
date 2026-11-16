@@ -221,3 +221,25 @@ img {
   font-size: 20px;
   line-height: 1;
 }
+
+/* In a desktop browser (the Vercel site) the app keeps a phone-like column instead of
+   stretching across the window. The transform makes #root the containing block of the
+   fixed-position update banner; sheets are portalled to <body> and are limited separately. */
+@media (min-width: 620px) {
+  body {
+    background: var(--paper-deep);
+  }
+
+  #root {
+    right: auto;
+    left: 50%;
+    width: 480px;
+    transform: translateX(-50%);
+    box-shadow: 0 0 0 1px var(--line);
+  }
+
+  .bottom-sheet {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}

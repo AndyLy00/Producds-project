@@ -13,6 +13,7 @@ import {
   HomeIcon,
   MagnifyingGlassIcon,
   MoonIcon,
+  PersonIcon,
   Pencil1Icon,
   PlusIcon,
   StarFilledIcon,
@@ -22,6 +23,7 @@ import {
 } from "@radix-ui/react-icons";
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { BottomSheet, KeyboardInput, MobileScroll, useKeyboard, useKeyboardInsets } from "./mobile";
+import { useCloudSync } from "./cloud-sync";
 import { loadShoppingData, saveShoppingData, type ShoppingData, type ShoppingItem, type ShoppingList } from "./shopping-data";
 
 const categories = ["Овощи и фрукты", "Мясо и рыба", "Молочные продукты", "Бакалея", "Напитки", "Для дома", "Сладости и снеки"];
@@ -72,7 +74,7 @@ function initialForm() {
   return { name: "", quantity: "1", unit: "шт.", category: categories[3], note: "" };
 }
 
-type SheetMode = "product" | "list" | null;
+type SheetMode = "product" | "list" | "account" | null;
 type Tab = "lists" | "favorites" | "history" | "settings";
 
 export default function Prototype() {
@@ -89,6 +91,10 @@ export default function Prototype() {
   const [quickName, setQuickName] = useState("");
   const [showPurchased, setShowPurchased] = useState(true);
   const [toast, setToast] = useState("");
+  const [accountMode, setAccountMode] = useState<"login" | "register">("login");
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
+  const [accountError, setAccountError] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
   const keyboard = useKeyboard();
   const { bottomInset } = useKeyboardInsets();
 
@@ -105,6 +111,8 @@ export default function Prototype() {
   useEffect(() => {
     if (ready) void saveShoppingData(data);
   }, [data, ready]);
+
+  const cloud = useCloudSync(data, setData, ready, setToast);
 
   useEffect(() => {
     document.documentElement.classList.toggle("smart-shopping-dark", data.darkMode);
@@ -242,6 +250,35 @@ export default function Prototype() {
     setToast("Добавлено в список");
   }
 
+  function openAccountSheet() {
+    setCredentials({ email: "", password: "" });
+    setAccountError("");
+    setAccountMode("login");
+    setSheetMode("account");
+  }
+
+  async function submitAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    keyboard.hide();
+    setAccountBusy(true);
+    setAccountError("");
+    try {
+      await cloud.signIn(accountMode, credentials.email, credentials.password);
+      setSheetMode(null);
+      setToast(accountMode === "register" ? "Аккаунт создан" : "Вы вошли в аккаунт");
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : "Не удалось войти.");
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  const syncLabel = { idle: "Подключение", syncing: "Сохранение", synced: "Сохранено", error: "Нет связи" }[cloud.status];
+  const sheetTitle = sheetMode === "account" ? (accountMode === "register" ? "Новый аккаунт" : "Вход в аккаунт")
+    : sheetMode === "list" ? (editingListId ? "Изменить список" : "Новый список")
+    : editingItem ? "Изменить продукт" : "Добавить продукт";
+  const sheetDescription = sheetMode === "account" ? "Списки сохранятся в аккаунте и будут доступны на других устройствах."
+    : sheetMode === "list" ? "Дайте списку короткое название." : "Количество, категория и заметка — по желанию.";
   const screenTitle = currentList?.name ?? "Мои списки";
 
   return (
@@ -343,8 +380,13 @@ export default function Prototype() {
               {tab === "settings" && <>
                 <section className="welcome-block compact-welcome"><p className="eyebrow">ПЕРСОНАЛИЗАЦИЯ</p><h1>Настройки</h1><p className="welcome-subtitle">Подстройте приложение под себя.</p></section>
                 <section className="settings-group"><p className="settings-label">ВНЕШНИЙ ВИД</p><button className="setting-row" onClick={() => setData((prev) => ({ ...prev, darkMode: !prev.darkMode }))}><span className="setting-icon">{data.darkMode ? <MoonIcon /> : <SunIcon />}</span><span><b>{data.darkMode ? "Тёмная тема" : "Светлая тема"}</b><small>Нажмите, чтобы переключить оформление</small></span><span className={`theme-switch ${data.darkMode ? "switch-on" : ""}`}><i /></span></button></section>
-                <section className="settings-group"><p className="settings-label">ДАННЫЕ</p><div className="setting-row static-row"><span className="setting-icon"><HomeIcon /></span><span><b>Хранение на устройстве</b><small>Списки доступны без интернета</small></span><span className="local-badge">Локально</span></div></section>
-                <div className="settings-note">Ваши покупки сохраняются на этом устройстве. Синхронизацию между устройствами можно добавить позже.</div>
+                <section className="settings-group"><p className="settings-label">АККАУНТ</p>
+                  {cloud.email ? <>
+                    <div className="setting-row static-row"><span className="setting-icon"><PersonIcon /></span><span><b>{cloud.email}</b><small>Списки сохраняются в аккаунте</small></span><span className={`local-badge ${cloud.status === "error" ? "badge-warning" : ""}`}>{syncLabel}</span></div>
+                    <button className="destructive-button account-sign-out" onClick={() => { cloud.signOut(); setToast("Вы вышли из аккаунта"); }}>Выйти из аккаунта</button>
+                  </> : <button className="setting-row" onClick={openAccountSheet}><span className="setting-icon"><PersonIcon /></span><span><b>Войти или создать аккаунт</b><small>Чтобы списки были на всех ваших устройствах</small></span><ChevronRightIcon /></button>}
+                </section>
+                <div className="settings-note">{cloud.email ? "Списки хранятся на этом устройстве и в вашем аккаунте. Без интернета приложение продолжает работать, изменения сохранятся при следующем подключении." : "Сейчас покупки сохраняются только на этом устройстве. Войдите в аккаунт, чтобы они не потерялись и были доступны на других устройствах."}</div>
               </>}
               <div className="bottom-spacer" />
             </main>
@@ -358,8 +400,19 @@ export default function Prototype() {
         </>
       )}
 
-      <BottomSheet open={sheetMode !== null} onOpenChange={(open) => { if (!open) { setSheetMode(null); keyboard.hide(); } }} title={sheetMode === "list" ? (editingListId ? "Изменить список" : "Новый список") : editingItem ? "Изменить продукт" : "Добавить продукт"} description={sheetMode === "list" ? "Дайте списку короткое название." : "Количество, категория и заметка — по желанию."} snap={0.84}>
-        {sheetMode === "product" ? (
+      <BottomSheet open={sheetMode !== null} onOpenChange={(open) => { if (!open) { setSheetMode(null); keyboard.hide(); } }} title={sheetTitle} description={sheetDescription} snap={0.84}>
+        {sheetMode === "account" ? (
+          <form className="sheet-form" onSubmit={submitAccount}>
+            <button type="button" className="sheet-close" aria-label="Закрыть форму" onClick={() => { keyboard.hide(); setSheetMode(null); }}><Cross2Icon /></button>
+            <label className="form-label">Почта<KeyboardInput type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="name@example.com" value={credentials.email} onChange={(event) => setCredentials((prev) => ({ ...prev, email: event.target.value }))} onBlur={() => keyboard.hide()} /></label>
+            <label className="form-label">Пароль<KeyboardInput type="password" autoComplete={accountMode === "register" ? "new-password" : "current-password"} placeholder="Не короче 8 символов" value={credentials.password} onChange={(event) => setCredentials((prev) => ({ ...prev, password: event.target.value }))} onBlur={() => keyboard.hide()} /></label>
+            {accountError && <p className="form-error" role="alert">{accountError}</p>}
+            <div className="sheet-actions">
+              <button className="primary-button" disabled={accountBusy || !credentials.email.trim() || !credentials.password}>{accountBusy ? "Подождите…" : accountMode === "register" ? "Создать аккаунт" : "Войти"}</button>
+              <button type="button" className="text-action account-switch" onClick={() => { setAccountMode(accountMode === "register" ? "login" : "register"); setAccountError(""); }}>{accountMode === "register" ? "У меня уже есть аккаунт" : "Создать новый аккаунт"}</button>
+            </div>
+          </form>
+        ) : sheetMode === "product" ? (
           <form className="sheet-form" onSubmit={saveProduct}>
             <button type="button" className="sheet-close" aria-label="Закрыть форму" onClick={() => { keyboard.hide(); setSheetMode(null); }}><Cross2Icon /></button>
             <label className="form-label">Название<KeyboardInput placeholder="Например, куриное филе" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value, category: prev.category === categories[3] ? guessCategory(event.target.value) : prev.category }))} onBlur={() => keyboard.hide()} /></label>
