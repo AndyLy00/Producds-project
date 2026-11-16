@@ -35,6 +35,8 @@ function androidApp(): Plugin {
 }
 
 export default defineConfig({
+  // Build number of this APK, set by the GitHub build; 0 marks a local build (see src/native/update.tsx).
+  define: { __APP_VERSION_CODE__: JSON.stringify(Number(process.env.APP_VERSION_CODE ?? 0)) },
   build: { outDir, emptyOutDir: true },
   resolve: {
     alias: [{ find: /^\.\/mobile$/, replacement: fileURLToPath(new URL("./src/native/index.tsx", import.meta.url)) }],

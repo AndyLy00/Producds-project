@@ -5,6 +5,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import Prototype from "../Prototype";
 import { KeyboardProvider } from "./index";
+import { UpdateBanner } from "./update";
 import "../prototype.css";
 import "./native.css";
 
@@ -37,5 +38,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <KeyboardProvider>
       <Prototype />
     </KeyboardProvider>
+    <UpdateBanner />
   </React.StrictMode>,
 );

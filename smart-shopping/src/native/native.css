@@ -164,3 +164,60 @@ img {
   overflow: auto;
   padding: 0 18px 24px;
 }
+
+/* "Update available" banner (update.tsx). It is rendered outside .shopping-app, so the theme
+   colors come from :root. */
+.update-banner {
+  position: fixed;
+  z-index: 15;
+  top: calc(var(--safe-top) + 8px);
+  right: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 7px 24px rgba(26, 41, 21, 0.16);
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+
+.update-banner-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.update-banner-text span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-banner-action {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--green);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.update-banner-close {
+  width: 32px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
