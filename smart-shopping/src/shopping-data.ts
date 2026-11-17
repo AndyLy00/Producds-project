@@ -1,28 +1,8 @@
-export type ShoppingItem = {
-  id: string;
-  name: string;
-  quantity: string;
-  unit: string;
-  category: string;
-  note: string;
-  purchased: boolean;
-  favorite: boolean;
-};
+// On-device storage of the app's data: IndexedDB, with a copy in localStorage in case IndexedDB is
+// unavailable. Shapes and operations: model.ts; the account copy: cloud-sync.ts.
+import { migrate, seedData, type ShoppingData } from "./model";
 
-export type ShoppingList = {
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-  completedAt?: number;
-  items: ShoppingItem[];
-};
-
-export type ShoppingData = {
-  lists: ShoppingList[];
-  history: ShoppingList[];
-  darkMode: boolean;
-};
+export type { ShoppingData } from "./model";
 
 export interface ShoppingRepository {
   load(): Promise<ShoppingData | null>;
@@ -30,58 +10,6 @@ export interface ShoppingRepository {
 }
 
 const storageKey = "smart-shopping.snapshot.v1";
-const seedTime = Date.now();
-
-function seedItem(id: string, name: string, quantity: string, unit: string, category: string, purchased = false, favorite = false, note = ""): ShoppingItem {
-  return { id, name, quantity, unit, category, purchased, favorite, note };
-}
-
-function seedData(): ShoppingData {
-  return {
-    darkMode: false,
-    history: [],
-    lists: [
-      {
-        id: "weekly-shop",
-        name: "Покупки на неделю",
-        createdAt: seedTime,
-        updatedAt: seedTime,
-        items: [
-          seedItem("weekly-milk", "Молоко", "1", "л", "Молочные продукты", true, true),
-          seedItem("weekly-bread", "Хлеб", "1", "шт.", "Бакалея", true, true),
-          seedItem("weekly-apples", "Яблоки", "1", "кг", "Овощи и фрукты", false, true),
-          seedItem("weekly-eggs", "Яйца", "10", "шт.", "Молочные продукты"),
-          seedItem("weekly-tomatoes", "Помидоры", "500", "г", "Овощи и фрукты"),
-          seedItem("weekly-cheese", "Сыр", "200", "г", "Молочные продукты"),
-          seedItem("weekly-coffee", "Кофе", "1", "уп.", "Бакалея"),
-        ],
-      },
-      {
-        id: "home-shop",
-        name: "Покупки для дома",
-        createdAt: seedTime - 86400000,
-        updatedAt: seedTime - 86400000,
-        items: [
-          seedItem("home-sponges", "Губки для посуды", "1", "уп.", "Для дома", true),
-          seedItem("home-paper", "Бумажные полотенца", "2", "уп.", "Для дома"),
-          seedItem("home-soap", "Жидкое мыло", "1", "шт.", "Для дома"),
-          seedItem("home-bags", "Пакеты для мусора", "1", "уп.", "Для дома"),
-        ],
-      },
-      {
-        id: "weekend-shop",
-        name: "Выходные",
-        createdAt: seedTime - 172800000,
-        updatedAt: seedTime - 172800000,
-        items: [
-          seedItem("weekend-chicken", "Куриное филе", "1", "кг", "Мясо и рыба"),
-          seedItem("weekend-potatoes", "Картофель", "2", "кг", "Овощи и фрукты"),
-          seedItem("weekend-sour-cream", "Сметана", "1", "шт.", "Молочные продукты"),
-        ],
-      },
-    ],
-  };
-}
 
 class IndexedShoppingRepository implements ShoppingRepository {
   private database: Promise<IDBDatabase> | null = null;
@@ -105,7 +33,7 @@ class IndexedShoppingRepository implements ShoppingRepository {
     const database = await this.openDatabase();
     return new Promise<ShoppingData | null>((resolve, reject) => {
       const request = database.transaction("snapshots", "readonly").objectStore("snapshots").get("current");
-      request.onsuccess = () => resolve((request.result as ShoppingData | undefined) ?? null);
+      request.onsuccess = () => resolve(migrate(request.result));
       request.onerror = () => reject(request.error ?? new Error("Не удалось прочитать списки"));
     });
   }
@@ -125,7 +53,7 @@ class LocalStorageRepository implements ShoppingRepository {
   async load() {
     try {
       const value = localStorage.getItem(storageKey);
-      return value ? JSON.parse(value) as ShoppingData : null;
+      return value ? migrate(JSON.parse(value)) : null;
     } catch {
       return null;
     }
@@ -146,9 +74,7 @@ class FallbackRepository implements ShoppingRepository {
     } catch {
       // Fall back to the same repository interface when IndexedDB is unavailable.
     }
-    const cached = await this.fallback.load();
-    if (cached) return cached;
-    return seedData();
+    return this.fallback.load();
   }
 
   async save(data: ShoppingData) {

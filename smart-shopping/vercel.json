@@ -3,5 +3,12 @@
   "framework": null,
   "installCommand": "npm ci",
   "buildCommand": "npm run build:web",
-  "outputDirectory": "dist/web"
+  "outputDirectory": "dist/web",
+  "rewrites": [{ "source": "/join", "destination": "/index.html" }],
+  "headers": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [{ "key": "Content-Type", "value": "application/json" }]
+    }
+  ]
 }

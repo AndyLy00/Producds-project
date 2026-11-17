@@ -30,5 +30,11 @@ public class MainActivity extends BridgeActivity {
             }
             runOnUiThread(() -> getWindow().getDecorView().setBackgroundColor(parsed));
         }
+
+        /** What the home-screen widget shows (src/device.ts, updateWidget). */
+        @JavascriptInterface
+        public void setWidget(String json) {
+            ListWidgetProvider.save(getApplicationContext(), json);
+        }
     }
 }

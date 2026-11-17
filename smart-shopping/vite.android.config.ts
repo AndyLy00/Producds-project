@@ -33,7 +33,9 @@ function androidApp(): Plugin {
       },
     },
     async closeBundle() {
-      await Promise.all(unusedInApp.map((path) => rm(`${outDir}/${path}`, { recursive: true, force: true })));
+      // The Android app link file (.well-known) only matters on the site.
+      const unused = outDir.endsWith("android") ? [...unusedInApp, ".well-known"] : unusedInApp;
+      await Promise.all(unused.map((path) => rm(`${outDir}/${path}`, { recursive: true, force: true })));
     },
   };
 }

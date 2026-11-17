@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.andyly00.korzina",
+      "sha256_cert_fingerprints": ["80:83:AA:24:96:1D:6C:42:7A:EA:6D:41:EF:13:74:4C:E5:C6:7E:A1:D4:4B:32:25:3C:E3:E8:30:45:03:0E:AC"]
+    }
+  }
+]

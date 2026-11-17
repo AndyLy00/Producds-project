@@ -1,0 +1,69 @@
+package io.github.andyly00.korzina;
+
+import android.app.PendingIntent;
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProvider;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.widget.RemoteViews;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+/**
+ * Home-screen widget with the first list of the app. The web app sends what to show through
+ * MainActivity's AppWindow.setWidget (src/device.ts, updateWidget); it is kept in
+ * SharedPreferences so the widget can be drawn while the app is closed.
+ */
+public class ListWidgetProvider extends AppWidgetProvider {
+
+    private static final String PREFERENCES = "korzina_widget";
+    private static final String KEY = "data";
+
+    static void save(Context context, String json) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().putString(KEY, json).apply();
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        int[] ids = manager.getAppWidgetIds(new ComponentName(context, ListWidgetProvider.class));
+        for (int id : ids) {
+            manager.updateAppWidget(id, views(context));
+        }
+    }
+
+    @Override
+    public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
+        for (int id : ids) {
+            manager.updateAppWidget(id, views(context));
+        }
+    }
+
+    private static RemoteViews views(Context context) {
+        SharedPreferences preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
+        String title = context.getString(R.string.app_name);
+        String subtitle = context.getString(R.string.widget_empty);
+        StringBuilder items = new StringBuilder();
+        try {
+            JSONObject data = new JSONObject(preferences.getString(KEY, "{}"));
+            title = data.optString("title", title);
+            subtitle = data.optString("subtitle", subtitle);
+            JSONArray list = data.optJSONArray("items");
+            for (int index = 0; list != null && index < list.length(); index++) {
+                if (index > 0) items.append('\n');
+                items.append("•  ").append(list.getString(index));
+            }
+        } catch (JSONException ignored) {
+            // Shows the empty widget until the app sends valid data again.
+        }
+
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_list);
+        views.setTextViewText(R.id.widget_title, title);
+        views.setTextViewText(R.id.widget_subtitle, subtitle);
+        views.setTextViewText(R.id.widget_items, items.toString());
+
+        Intent open = new Intent(context, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pending = PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.widget_root, pending);
+        return views;
+    }
+}

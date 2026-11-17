@@ -1,48 +1,55 @@
-// Account and cloud copy of the lists (server side: api/*.js, stored in MongoDB).
-// The app keeps working from the on-device copy; while signed in, every change is also saved
-// to the account and changes made on other devices are picked up when the app is opened.
+// Account and cloud copy of the data (server side: api/*.js, stored in MongoDB).
+// The app always works from the on-device copy. While signed in, local changes are sent to the
+// account shortly after they are made, and the account is checked for changes from other devices
+// and from people sharing a list every few seconds while the app is open. Both copies are merged
+// per entity (model.ts, shared/merge.js), so edits made on several devices at once are all kept.
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { ShoppingData } from "./shopping-data";
+import { isDemoList, mergeData, profileOf, type ShoppingData, type ShoppingList, type Profile, type Sharing } from "./model";
 
 // Absolute because the Android app is not served from this origin. VITE_API_ORIGIN points a
 // local build at another server.
-const API_ORIGIN: string = import.meta.env.VITE_API_ORIGIN ?? "https://korzina-peach.vercel.app";
-const SESSION_KEY = "smart-shopping.account.v1";
-const PUSH_DELAY = 1000;
+export const API_ORIGIN: string = import.meta.env.VITE_API_ORIGIN ?? "https://korzina-peach.vercel.app";
+const SESSION_KEY = "smart-shopping.account.v2";
+const VERIFIER_KEY = "smart-shopping.google-verifier";
+const PUSH_DELAY = 700;
+const POLL_INTERVAL = 5000;
 
-type Session = { email: string; token: string; version: number };
-type Remote = { version: number; data: ShoppingData | null };
+type Session = { email: string; token: string; verified: boolean; hasPassword: boolean; since: number };
+type AccountResponse = Omit<Session, "since">;
+type SyncResponse = { lists: ShoppingList[]; profile: Profile; sharing: Sharing; revoked: string[]; now: number };
 export type SyncStatus = "idle" | "syncing" | "synced" | "error";
+export type AuthConfig = { googleClientId: string | null; email: boolean };
+export type Member = { email: string; owner: boolean; you: boolean };
 
-class ApiError extends Error {
-  constructor(readonly status: number, message: string, readonly body: unknown) {
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) {
     super(message);
   }
 }
 
-async function api<T>(path: string, init: { method?: string; token?: string; body?: unknown } = {}): Promise<T> {
+export async function api<T>(path: string, body?: unknown, token?: string): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${API_ORIGIN}${path}`, {
-      method: init.method ?? "GET",
+      method: body === undefined ? "GET" : "POST",
       headers: {
-        ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
-        ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, "Нет связи с сервером. Проверьте интернет.", null);
+    throw new ApiError(0, "Нет связи с сервером. Проверьте интернет.");
   }
-  const body = (await response.json().catch(() => null)) as { error?: string } | null;
-  if (!response.ok) throw new ApiError(response.status, body?.error ?? "Сервер временно недоступен. Попробуйте позже.", body);
-  return body as T;
+  const result = (await response.json().catch(() => null)) as { error?: string } | null;
+  if (!response.ok) throw new ApiError(response.status, result?.error ?? "Сервер временно недоступен. Попробуйте позже.");
+  return result as T;
 }
 
 function readSession(): Session | null {
   try {
     const value = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null") as Session | null;
-    return value && typeof value.token === "string" && typeof value.email === "string" ? { ...value, version: Number(value.version) || 0 } : null;
+    return value && typeof value.token === "string" ? { ...value, since: Number(value.since) || 0 } : null;
   } catch {
     return null;
   }
@@ -57,9 +64,8 @@ function writeSession(session: Session | null) {
   }
 }
 
-// The same shape and key order the server stores, so snapshots can be compared as strings.
-function serialize(data: ShoppingData) {
-  return JSON.stringify({ lists: data.lists, history: data.history, darkMode: data.darkMode });
+function base64url(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 export function useCloudSync(
@@ -70,12 +76,13 @@ export function useCloudSync(
 ) {
   const [session, setSession] = useState<Session | null>(readSession);
   const [status, setStatus] = useState<SyncStatus>("idle");
+  const [config, setConfig] = useState<AuthConfig>({ googleClientId: null, email: false });
+  const [dirtyTick, setDirtyTick] = useState(0);
   const sessionRef = useRef(session);
   const dataRef = useRef(data);
   dataRef.current = data;
-  // Snapshot known to be stored in the account; null until the first exchange after start.
-  const syncedRef = useRef<string | null>(null);
-  // Sync steps run one after another so that two saves never race each other.
+  const dirtyRef = useRef(false);
+  // Sync steps run one after another so that two exchanges never race each other.
   const queueRef = useRef<Promise<void>>(Promise.resolve());
 
   const updateSession = useCallback((next: Session | null) => {
@@ -84,104 +91,181 @@ export function useCloudSync(
     setSession(next);
   }, []);
 
-  const adopt = useCallback((remote: Remote & { data: ShoppingData }) => {
-    syncedRef.current = serialize(remote.data);
-    if (sessionRef.current) updateSession({ ...sessionRef.current, version: remote.version });
-    setData(remote.data);
+  useEffect(() => {
+    api<AuthConfig>("/api/auth").then(setConfig, () => undefined);
+  }, []);
+
+  const exchange = useCallback(async (current: Session) => {
+    // Everything is sent after a local change and on the first exchange of a session; otherwise
+    // the app only asks what changed.
+    const full = dirtyRef.current || current.since === 0;
+    dirtyRef.current = false;
+    const sent = dataRef.current;
+    try {
+      const result = await api<SyncResponse>(
+        "/api/sync",
+        { lists: full ? sent.lists.filter((list) => !isDemoList(list)) : [], profile: full ? profileOf(sent) : null, since: current.since },
+        current.token,
+      );
+      // On the first exchange with an account that has lists, the untouched demo lists give way.
+      const dropDemo = current.since === 0 && result.lists.some((list) => !list.deleted);
+      setData((previous) => mergeData(dropDemo ? { ...previous, lists: previous.lists.filter((list) => !isDemoList(list)) } : previous, result));
+      const latest = sessionRef.current;
+      if (latest?.token === current.token) updateSession({ ...latest, since: result.now });
+    } catch (error) {
+      if (full) dirtyRef.current = true;
+      throw error;
+    }
   }, [setData, updateSession]);
 
-  const push = useCallback(async (current: Session, retried = false): Promise<void> => {
-    const snapshot = serialize(dataRef.current);
-    try {
-      const saved = await api<{ version: number }>("/api/data", {
-        method: "PUT",
-        token: current.token,
-        body: { baseVersion: current.version, data: JSON.parse(snapshot) },
-      });
-      syncedRef.current = snapshot;
-      updateSession({ ...current, version: saved.version });
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 409) throw error;
-      const remote = error.body as Remote;
-      if (remote.data) {
-        adopt(remote as Remote & { data: ShoppingData });
-        notify("Списки обновлены с другого устройства");
-      } else if (!retried) {
-        // Nothing is stored for the account (any more): start it from this device's lists.
-        await push({ ...current, version: 0 }, true);
-      } else {
-        throw error;
-      }
-    }
-  }, [adopt, notify, updateSession]);
-
-  const pull = useCallback(async (current: Session) => {
-    const remote = await api<Remote>("/api/data", { token: current.token });
-    if (!remote.data) return push({ ...current, version: 0 });
-    if (remote.version !== current.version) return adopt(remote as Remote & { data: ShoppingData });
-    if (serialize(remote.data) === serialize(dataRef.current)) syncedRef.current = serialize(remote.data);
-    else await push(current);
-  }, [adopt, push]);
-
-  const enqueue = useCallback((step: (current: Session) => Promise<void>) => {
+  const enqueue = useCallback(<T,>(step: (current: Session) => Promise<T>, quiet = false) => {
     const run = queueRef.current.then(async () => {
       const current = sessionRef.current;
-      if (!current) return;
-      setStatus("syncing");
+      if (!current) throw new ApiError(401, "Войдите в аккаунт.");
+      if (!quiet) setStatus("syncing");
       try {
-        await step(current);
+        const result = await step(current);
         setStatus("synced");
+        return result;
       } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
+        if (error instanceof ApiError && error.status === 401 && sessionRef.current?.token === current.token) {
           updateSession(null);
           setStatus("idle");
           notify("Сессия истекла. Войдите в аккаунт заново.");
-        } else {
+        } else if (error instanceof ApiError && error.status === 0) {
           setStatus("error");
         }
+        throw error;
       }
     });
-    queueRef.current = run;
+    queueRef.current = run.then(() => undefined, () => undefined);
     return run;
   }, [notify, updateSession]);
 
-  // Catch up with the account when the app starts and whenever it comes back to the foreground.
+  const sync = useCallback((quiet = false) => enqueue(exchange, quiet).catch(() => undefined), [enqueue, exchange]);
+
+  // Called by the app after every change the user makes.
+  const markDirty = useCallback(() => {
+    dirtyRef.current = true;
+    setDirtyTick((tick) => tick + 1);
+  }, []);
+
   const signedIn = session !== null;
-  useEffect(() => {
-    if (!ready || !signedIn) return;
-    const refresh = () => {
-      if (document.visibilityState === "visible") void enqueue(pull);
-    };
-    refresh();
-    document.addEventListener("visibilitychange", refresh);
-    return () => document.removeEventListener("visibilitychange", refresh);
-  }, [ready, signedIn, enqueue, pull]);
+  const token = session?.token;
 
-  // Save changes shortly after they are made.
   useEffect(() => {
-    if (!ready || !signedIn) return;
-    const timer = window.setTimeout(() => {
-      void enqueue(async (current) => {
-        if (syncedRef.current !== null && syncedRef.current !== serialize(dataRef.current)) await push(current);
-      });
-    }, PUSH_DELAY);
+    if (!ready || !signedIn || !dirtyRef.current) return;
+    const timer = window.setTimeout(() => void sync(), PUSH_DELAY);
     return () => window.clearTimeout(timer);
-  }, [data, ready, signedIn, enqueue, push]);
+  }, [dirtyTick, ready, signedIn, sync]);
 
-  // Rejects with a message for the user when the credentials are not accepted.
-  const signIn = useCallback(async (mode: "login" | "register", email: string, password: string) => {
-    const account = await api<{ token: string; email: string }>(`/api/${mode}`, { method: "POST", body: { email, password } });
-    syncedRef.current = null;
-    // Version 0 makes the first exchange take the account's lists if it has any, and
-    // otherwise start the account from the lists on this device.
-    updateSession({ email: account.email, token: account.token, version: 0 });
+  // Near-real-time updates: check often while the app is on screen, at once when it comes back.
+  useEffect(() => {
+    if (!ready || !token) return;
+    const check = () => {
+      if (document.visibilityState === "visible") void sync(true);
+    };
+    check();
+    const timer = window.setInterval(check, POLL_INTERVAL);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [ready, token, sync]);
+
+  // Picks up an email address confirmed or a password set from another device.
+  useEffect(() => {
+    if (!token) return;
+    api<AccountResponse>("/api/auth", { action: "me" }, token).then((me) => {
+      const latest = sessionRef.current;
+      if (latest?.token === token) updateSession({ ...latest, verified: me.verified, hasPassword: me.hasPassword, email: me.email });
+    }, () => undefined);
+  }, [token, updateSession]);
+
+  const startSession = useCallback((account: AccountResponse, keepSince = false) => {
+    updateSession({ ...account, since: keepSince ? (sessionRef.current?.since ?? 0) : 0 });
+    if (!keepSince) {
+      // The first exchange merges this device's lists with the account's.
+      dirtyRef.current = true;
+      setDirtyTick((tick) => tick + 1);
+    }
   }, [updateSession]);
+
+  const authed = useCallback(<T,>(body: Record<string, unknown>) => {
+    const current = sessionRef.current;
+    if (!current) return Promise.reject(new ApiError(401, "Войдите в аккаунт."));
+    return api<T>("/api/auth", body, current.token);
+  }, []);
 
   const signOut = useCallback(() => {
-    syncedRef.current = null;
     updateSession(null);
     setStatus("idle");
-  }, [updateSession]);
+    setData((previous) => ({ ...previous, sharing: {} }));
+  }, [setData, updateSession]);
 
-  return { email: session?.email ?? null, status, signIn, signOut };
+  const account = {
+    signIn: async (mode: "login" | "register", email: string, password: string) =>
+      startSession(await api<AccountResponse>("/api/auth", { action: mode, email, password })),
+    verifyEmail: async (code: string) => startSession(await authed<AccountResponse>({ action: "verify-email", code }), true),
+    resendVerification: () => authed({ action: "resend-verification" }),
+    forgotPassword: (email: string) => api("/api/auth", { action: "forgot", email }),
+    resetPassword: async (email: string, code: string, password: string) =>
+      startSession(await api<AccountResponse>("/api/auth", { action: "reset", email, code, password })),
+    changePassword: async (current: string, password: string) =>
+      startSession(await authed<AccountResponse>({ action: "change-password", current, password }), true),
+    deleteAccount: async (password: string) => {
+      await authed({ action: "delete-account", password });
+      signOut();
+    },
+    googleCredential: async (credential: string) => startSession(await api<AccountResponse>("/api/auth", { action: "google", credential })),
+    // Android: Google sign-in happens in the browser (see native/app-login.tsx), which hands back
+    // a one-time code that only this device can redeem with the verifier it keeps.
+    startAppGoogleLogin: async () => {
+      const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+      localStorage.setItem(VERIFIER_KEY, verifier);
+      window.location.assign(`${API_ORIGIN}/?app-login=${base64url(digest)}`);
+    },
+    finishAppGoogleLogin: async (code: string) => {
+      const verifier = localStorage.getItem(VERIFIER_KEY);
+      if (!verifier) throw new ApiError(400, "Вход не завершён. Попробуйте ещё раз.");
+      localStorage.removeItem(VERIFIER_KEY);
+      startSession(await api<AccountResponse>("/api/auth", { action: "google-handoff", code, verifier }));
+    },
+    signOut,
+  };
+
+  const share = {
+    // The list must exist on the server before it can be shared.
+    invite: async (listId: string, email?: string) => {
+      await enqueue(exchange);
+      return enqueue((current) => api<{ link: string }>("/api/share", { action: "invite", listId, email }, current.token));
+    },
+    join: async (token: string) => {
+      const joined = await enqueue((current) => api<{ listId: string; name: string }>("/api/share", { action: "join", token }, current.token));
+      await sync();
+      return joined;
+    },
+    leave: async (listId: string) => {
+      await enqueue((current) => api("/api/share", { action: "leave", listId }, current.token));
+      setData((previous) => ({ ...previous, lists: previous.lists.filter((list) => list.id !== listId) }));
+    },
+    members: (listId: string) =>
+      enqueue((current) => api<{ members: Member[] }>("/api/share", { action: "members", listId }, current.token), true).then((result) => result.members),
+  };
+
+  return {
+    email: session?.email ?? null,
+    verified: session?.verified ?? false,
+    hasPassword: session?.hasPassword ?? false,
+    status,
+    config,
+    markDirty,
+    sync,
+    account,
+    share,
+  };
 }
+
+export type CloudSync = ReturnType<typeof useCloudSync>;

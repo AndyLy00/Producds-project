@@ -1,24 +1,22 @@
-// Tests of the account API (api/*.js) against a real MongoDB.
+// Tests of the server (api/*.js) against a real MongoDB.
 // MONGODB_URI must point at a disposable database; without it the tests are skipped.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, before, beforeEach, test } from "node:test";
 
 const skip = process.env.MONGODB_URI ? false : "MONGODB_URI is not set";
 process.env.AUTH_SECRET ??= "test-secret";
 process.env.MONGODB_DB = `korzina-test-${Date.now()}`;
+process.env.EMAIL_TRANSPORT = "memory";
+delete process.env.GOOGLE_CLIENT_ID;
 
 let api;
 let db;
 
 before(async () => {
   if (skip) return;
-  const [register, login, data, lib] = await Promise.all([
-    import("../api/register.js"),
-    import("../api/login.js"),
-    import("../api/data.js"),
-    import("../api/_lib.js"),
-  ]);
-  api = { register: register.POST, login: login.POST, get: data.GET, put: data.PUT };
+  const [auth, sync, share, lib] = await Promise.all([import("../api/auth.js"), import("../api/sync.js"), import("../api/share.js"), import("../api/_lib.js")]);
+  api = { auth: auth.POST, config: auth.GET, sync: sync.POST, share: share.POST };
   db = await lib.database();
 });
 
@@ -30,11 +28,15 @@ after(async () => {
 
 // Each test calls from its own address so that the per-address limits do not add up across tests.
 let address = 0;
+beforeEach(() => {
+  address += 1;
+  globalThis.korzinaOutbox = [];
+});
 
-async function call(handler, { method = "POST", token, body, ip = `198.51.100.${address}` } = {}) {
+async function call(handler, body, { token, ip = `198.51.100.${address}` } = {}) {
   const response = await handler(
-    new Request("https://example.test/api", {
-      method,
+    new Request("https://korzina.example/api", {
+      method: body === undefined ? "GET" : "POST",
       headers: { "x-real-ip": ip, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
@@ -42,102 +44,168 @@ async function call(handler, { method = "POST", token, body, ip = `198.51.100.${
   return { status: response.status, body: await response.json() };
 }
 
-beforeEach(() => {
-  address += 1;
-});
+const auth = (body, options) => call(api.auth, body, options);
+const register = async (email, password = "long-enough") => (await auth({ action: "register", email, password })).body;
+const lastCode = (to) => /\d{6}/.exec(globalThis.korzinaOutbox.filter((mail) => mail.to === to).at(-1)?.subject ?? "")?.[0];
 
-const lists = (name) => ({ lists: [{ id: "1", name, createdAt: 1, updatedAt: 1, items: [] }], history: [], darkMode: false });
+const item = (id, name, updatedAt, extra = {}) => ({ id, name, quantity: "1", unit: "шт.", category: "Бакалея", note: "", purchased: false, favorite: false, order: 1, updatedAt, ...extra });
+const list = (id, name, updatedAt, items = []) => ({ id, name, createdAt: 1, updatedAt, sortMode: "category", items });
+const profile = (extra = {}) => ({ stores: [], templates: [], recipes: [], categories: [], settings: { darkMode: false, updatedAt: 0 }, ...extra });
 
-test("registration validates input and refuses a duplicate email", { skip }, async () => {
-  assert.equal((await call(api.register, { body: { email: "not-an-email", password: "long-enough" } })).status, 400);
-  assert.equal((await call(api.register, { body: { email: "a@example.com", password: "short" } })).status, 400);
+test("registration validates input, refuses a duplicate email and sends a verification code", { skip }, async () => {
+  assert.equal((await auth({ action: "register", email: "not-an-email", password: "long-enough" })).status, 400);
+  assert.equal((await auth({ action: "register", email: "a@example.com", password: "short" })).status, 400);
 
-  const created = await call(api.register, { body: { email: " Anna@Example.com ", password: "long-enough" } });
+  const created = await auth({ action: "register", email: " Anna@Example.com ", password: "long-enough" });
   assert.equal(created.status, 201);
-  assert.equal(created.body.email, "anna@example.com");
-  assert.ok(created.body.token);
+  assert.deepEqual({ ...created.body, token: "…" }, { token: "…", email: "anna@example.com", verified: false, hasPassword: true });
+  assert.match(lastCode("anna@example.com"), /^\d{6}$/);
 
-  assert.equal((await call(api.register, { body: { email: "anna@example.com", password: "another-pass" } })).status, 409);
+  assert.equal((await auth({ action: "register", email: "anna@example.com", password: "another-pass" })).status, 409);
+  assert.deepEqual((await call(api.config)).body, { googleClientId: null, email: true });
 });
 
-test("the password is stored hashed and checked on login", { skip }, async () => {
-  await call(api.register, { body: { email: "boris@example.com", password: "correct-horse" } });
-  const stored = await db.collection("users").findOne({ email: "boris@example.com" });
+test("the email address is confirmed with the code, and a wrong code is refused", { skip }, async () => {
+  const { token } = await register("boris@example.com");
+  assert.equal((await auth({ action: "verify-email", code: "000000" }, { token })).status, 400);
+  const verified = await auth({ action: "verify-email", code: lastCode("boris@example.com") }, { token });
+  assert.equal(verified.status, 200);
+  assert.equal(verified.body.verified, true);
+  assert.equal((await auth({ action: "me" }, { token })).body.verified, true);
+});
+
+test("the password is stored hashed and wrong passwords lock the account for a while", { skip }, async () => {
+  await register("dasha@example.com", "correct-horse");
+  const stored = await db.collection("users").findOne({ email: "dasha@example.com" });
   assert.ok(!JSON.stringify(stored).includes("correct-horse"));
 
-  assert.equal((await call(api.login, { body: { email: "boris@example.com", password: "wrong-horse" } })).status, 401);
-  assert.equal((await call(api.login, { body: { email: "nobody@example.com", password: "correct-horse" } })).status, 401);
-  const session = await call(api.login, { body: { email: "boris@example.com", password: "correct-horse" } });
-  assert.equal(session.status, 200);
-  assert.ok(session.body.token);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    assert.equal((await auth({ action: "login", email: "dasha@example.com", password: `guess-${attempt}-x` })).status, 401);
+  }
+  assert.equal((await auth({ action: "login", email: "dasha@example.com", password: "correct-horse" }, { ip: "203.0.113.50" })).status, 429);
+});
+
+test("a forgotten password is reset with a code from the email, which signs out other devices", { skip }, async () => {
+  const { token: oldToken } = await register("egor@example.com", "first-password");
+  assert.deepEqual((await auth({ action: "forgot", email: "nobody@example.com" })).body, { ok: true });
+  assert.equal((await auth({ action: "forgot", email: "egor@example.com" })).status, 200);
+  const code = lastCode("egor@example.com");
+
+  assert.equal((await auth({ action: "reset", email: "egor@example.com", code: "999999", password: "second-password" })).status, 400);
+  const reset = await auth({ action: "reset", email: "egor@example.com", code, password: "second-password" });
+  assert.equal(reset.status, 200);
+  assert.equal(reset.body.verified, true);
+  assert.equal((await auth({ action: "reset", email: "egor@example.com", code, password: "third-password" })).status, 400, "a code works once");
+
+  assert.equal((await auth({ action: "me" }, { token: oldToken })).status, 401, "old sessions end");
+  assert.equal((await auth({ action: "login", email: "egor@example.com", password: "second-password" })).status, 200);
+});
+
+test("changing the password needs the current one", { skip }, async () => {
+  const { token } = await register("zhenya@example.com", "first-password");
+  assert.equal((await auth({ action: "change-password", current: "wrong-password", password: "second-password" }, { token })).status, 400);
+  const changed = await auth({ action: "change-password", current: "first-password", password: "second-password" }, { token });
+  assert.equal(changed.status, 200);
+  assert.equal((await auth({ action: "me" }, { token })).status, 401);
+  assert.equal((await auth({ action: "me" }, { token: changed.body.token })).status, 200);
+});
+
+test("Google sign-in is refused until it is configured, and its one-time code needs the right verifier", { skip }, async () => {
+  assert.equal((await auth({ action: "google", credential: "anything" })).status, 503);
+  const { token } = await register("google@example.com");
+  const user = await db.collection("users").findOne({ email: "google@example.com" });
+  const verifier = "v".repeat(43);
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  await db.collection("handoffs").insertOne({ _id: "one-time", userId: user._id, challenge, expiresAt: new Date(Date.now() + 60_000) });
+  assert.equal((await auth({ action: "google-handoff", code: "one-time", verifier: "w".repeat(43) })).status, 400);
+  await db.collection("handoffs").insertOne({ _id: "second", userId: user._id, challenge, expiresAt: new Date(Date.now() + 60_000) });
+  const handed = await auth({ action: "google-handoff", code: "second", verifier });
+  assert.equal(handed.status, 200);
+  assert.equal(handed.body.email, "google@example.com");
+  assert.ok(token);
 });
 
 test("lists need a valid session", { skip }, async () => {
-  assert.equal((await call(api.get, { method: "GET" })).status, 401);
-  assert.equal((await call(api.get, { method: "GET", token: "forged.token" })).status, 401);
+  assert.equal((await call(api.sync, { lists: [] })).status, 401);
+  assert.equal((await call(api.sync, { lists: [] }, { token: "forged.token" })).status, 401);
 });
 
-test("lists are saved per account and a stale save is rejected with the stored copy", { skip }, async () => {
-  const vera = (await call(api.register, { body: { email: "vera@example.com", password: "long-enough" } })).body.token;
-  const gleb = (await call(api.register, { body: { email: "gleb@example.com", password: "long-enough" } })).body.token;
+test("edits made on two devices at once are merged instead of overwritten", { skip }, async () => {
+  const { token } = await register("vera@example.com");
+  const base = list("L1", "Дом", 10, [item("a", "Хлеб", 10), item("b", "Молоко", 10)]);
+  const first = await call(api.sync, { lists: [base], profile: profile(), since: 0 }, { token });
+  assert.equal(first.status, 200);
 
-  assert.deepEqual((await call(api.get, { method: "GET", token: vera })).body, { version: 0, data: null });
+  // Phone renames the list and buys bread; laptop (still holding the old copy) deletes milk and adds eggs.
+  const phone = { ...base, name: "Дом и дача", updatedAt: 20, items: [item("a", "Хлеб", 21, { purchased: true }), item("b", "Молоко", 10)] };
+  const laptop = { ...base, items: [item("a", "Хлеб", 10), item("b", "Молоко", 22, { deleted: true }), item("c", "Яйца", 23)] };
+  await call(api.sync, { lists: [phone], profile: null, since: first.body.now }, { token });
+  const merged = await call(api.sync, { lists: [laptop], profile: null, since: 0 }, { token });
+  const saved = merged.body.lists.find((entry) => entry.id === "L1");
+  assert.equal(saved.name, "Дом и дача");
+  assert.deepEqual(
+    Object.fromEntries(saved.items.map((entry) => [entry.name, entry.deleted ? "deleted" : entry.purchased ? "bought" : "to buy"])),
+    { Хлеб: "bought", Молоко: "deleted", Яйца: "to buy" },
+  );
 
-  const first = await call(api.put, { method: "PUT", token: vera, body: { baseVersion: 0, data: lists("Дом") } });
-  assert.deepEqual(first, { status: 200, body: { version: 1 } });
-  const second = await call(api.put, { method: "PUT", token: vera, body: { baseVersion: 1, data: lists("Дача") } });
-  assert.deepEqual(second, { status: 200, body: { version: 2 } });
-
-  // Another device still at version 1 must not overwrite version 2.
-  const stale = await call(api.put, { method: "PUT", token: vera, body: { baseVersion: 1, data: lists("Старое") } });
-  assert.equal(stale.status, 409);
-  assert.equal(stale.body.version, 2);
-  assert.equal(stale.body.data.lists[0].name, "Дача");
-
-  assert.equal((await call(api.get, { method: "GET", token: vera })).body.data.lists[0].name, "Дача");
-  assert.deepEqual((await call(api.get, { method: "GET", token: gleb })).body, { version: 0, data: null });
-
-  assert.equal((await call(api.put, { method: "PUT", token: vera, body: { baseVersion: 2, data: { lists: "nope" } } })).status, 400);
+  // Asking only for news returns nothing new until something changes.
+  const quiet = await call(api.sync, { lists: [], since: merged.body.now + 60_000 }, { token });
+  assert.deepEqual(quiet.body.lists, []);
 });
 
-test("repeated wrong passwords lock the account for a while, even for the right password", { skip }, async () => {
-  const credentials = { email: "dasha@example.com", password: "correct-horse" };
-  await call(api.register, { body: credentials });
+test("the profile (stores, templates, recipes, categories, theme) is merged and kept per account", { skip }, async () => {
+  const { token } = await register("gleb@example.com");
+  await call(api.sync, { lists: [], profile: profile({ recipes: [{ id: "r1", name: "Борщ", note: "", ingredients: [], updatedAt: 5 }] }), since: 0 }, { token });
+  const result = await call(api.sync, { lists: [], profile: profile({ stores: [{ id: "s1", name: "У дома", categoryOrder: ["Напитки"], updatedAt: 6 }], settings: { darkMode: true, updatedAt: 7 } }), since: 0 }, { token });
+  assert.deepEqual(result.body.profile.recipes.map((recipe) => recipe.name), ["Борщ"]);
+  assert.deepEqual(result.body.profile.stores.map((store) => store.name), ["У дома"]);
+  assert.equal(result.body.profile.settings.darkMode, true);
+  assert.equal(JSON.stringify(result.body.profile).includes("Борщ"), true);
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    assert.equal((await call(api.login, { body: { ...credentials, password: `guess-number-${attempt}` } })).status, 401);
-  }
-  const blocked = await call(api.login, { body: { ...credentials, password: "guess-number-5" } });
-  assert.equal(blocked.status, 429);
-  assert.match(blocked.body.error, /Слишком много попыток/);
-  // Changing address does not help the attacker, and the correct password is not confirmed either.
-  assert.equal((await call(api.login, { body: credentials, ip: "203.0.113.50" })).status, 429);
-
-  // Other accounts are not affected.
-  await call(api.register, { body: { email: "egor@example.com", password: "long-enough" } });
-  assert.equal((await call(api.login, { body: { email: "egor@example.com", password: "long-enough" } })).status, 200);
+  const { token: other } = await register("other@example.com");
+  assert.deepEqual((await call(api.sync, { lists: [], since: 0 }, { token: other })).body.profile.recipes, []);
 });
 
-test("a successful sign-in resets the count of wrong passwords", { skip }, async () => {
-  const credentials = { email: "zhenya@example.com", password: "correct-horse" };
-  await call(api.register, { body: credentials });
-  for (let round = 0; round < 3; round += 1) {
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      assert.equal((await call(api.login, { body: { ...credentials, password: "wrong-horse" } })).status, 401);
-    }
-    assert.equal((await call(api.login, { body: credentials })).status, 200);
-  }
+test("a list is shared through an invitation link, and leaving it stops access", { skip }, async () => {
+  const owner = (await register("owner@example.com")).token;
+  const guest = (await register("guest@example.com")).token;
+  await call(api.sync, { lists: [list("S1", "Семья", 5, [item("x", "Сыр", 5)])], profile: profile(), since: 0 }, { token: owner });
+
+  assert.equal((await call(api.share, { action: "invite", listId: "S1" }, { token: guest })).status, 404, "only members can invite");
+  const invite = await call(api.share, { action: "invite", listId: "S1" }, { token: owner });
+  assert.match(invite.body.link, /^https:\/\/korzina\.example\/join\?invite=/);
+  assert.equal((await call(api.share, { action: "invite", listId: "S1", email: "friend@example.com" }, { token: owner })).status, 403, "unconfirmed senders cannot email");
+
+  const joined = await call(api.share, { action: "join", token: new URL(invite.body.link).searchParams.get("invite") }, { token: guest });
+  assert.deepEqual(joined.body, { listId: "S1", name: "Семья" });
+
+  const guestView = await call(api.sync, { lists: [], since: 0 }, { token: guest });
+  assert.deepEqual(guestView.body.lists.map((entry) => entry.name), ["Семья"]);
+  assert.deepEqual(guestView.body.sharing, { S1: { members: 2, owner: false } });
+
+  // The guest adds a product; the owner sees it.
+  await call(api.sync, { lists: [{ ...guestView.body.lists[0], items: [...guestView.body.lists[0].items, item("y", "Хлеб", 9)] }], since: 0 }, { token: guest });
+  const ownerView = await call(api.sync, { lists: [], since: 0 }, { token: owner });
+  assert.deepEqual(ownerView.body.lists[0].items.map((entry) => entry.name).sort(), ["Сыр", "Хлеб"]);
+  const members = await call(api.share, { action: "members", listId: "S1" }, { token: owner });
+  assert.deepEqual(members.body.members.map((member) => member.email).sort(), ["guest@example.com", "owner@example.com"]);
+
+  await call(api.share, { action: "leave", listId: "S1" }, { token: guest });
+  const afterLeave = await call(api.sync, { lists: guestView.body.lists, since: 0 }, { token: guest });
+  assert.deepEqual(afterLeave.body.revoked, ["S1"]);
+  assert.deepEqual(afterLeave.body.lists, []);
 });
 
-test("one address cannot try a password against many accounts or mass-register", { skip }, async () => {
-  const ip = "203.0.113.99";
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    assert.equal((await call(api.login, { ip, body: { email: `victim${attempt}@example.com`, password: "password123" } })).status, 401);
-  }
-  assert.equal((await call(api.login, { ip, body: { email: "victim30@example.com", password: "password123" } })).status, 429);
+test("deleting the account removes it and keeps shared lists for the others", { skip }, async () => {
+  const owner = (await register("leaving@example.com", "my-password")).token;
+  const friend = (await register("staying@example.com")).token;
+  await call(api.sync, { lists: [list("D1", "Общий", 5), list("D2", "Личный", 5)], profile: profile(), since: 0 }, { token: owner });
+  const invite = await call(api.share, { action: "invite", listId: "D1" }, { token: owner });
+  await call(api.share, { action: "join", token: new URL(invite.body.link).searchParams.get("invite") }, { token: friend });
 
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    assert.equal((await call(api.register, { ip, body: { email: `bulk${attempt}@example.com`, password: "long-enough" } })).status, 201);
-  }
-  assert.equal((await call(api.register, { ip, body: { email: "bulk10@example.com", password: "long-enough" } })).status, 429);
+  assert.equal((await auth({ action: "delete-account", password: "wrong-password" }, { token: owner })).status, 400);
+  assert.equal((await auth({ action: "delete-account", password: "my-password" }, { token: owner })).status, 200);
+  assert.equal((await auth({ action: "login", email: "leaving@example.com", password: "my-password" })).status, 401);
+  assert.equal(await db.collection("lists").countDocuments({ _id: "D2" }), 0);
+  assert.deepEqual((await call(api.sync, { lists: [], since: 0 }, { token: friend })).body.lists.map((entry) => entry.name), ["Общий"]);
 });

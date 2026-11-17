@@ -222,6 +222,55 @@ img {
   line-height: 1;
 }
 
+/* Google sign-in page for the Android app (app-login.tsx). */
+.app-login {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px 24px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  text-align: center;
+}
+
+.app-login h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.8px;
+}
+
+.app-login p {
+  max-width: 300px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.app-login .brand-mark {
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.app-login-slot {
+  min-height: 44px;
+}
+
+.app-login .app-login-done {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.app-login a.primary-button {
+  text-decoration: none;
+}
+
 /* In a desktop browser (the Vercel site) the app keeps a phone-like column instead of
    stretching across the window. The transform makes #root the containing block of the
    fixed-position update banner; sheets are portalled to <body> and are limited separately. */

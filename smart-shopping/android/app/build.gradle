@@ -1,9 +1,10 @@
 apply plugin: 'com.android.application'
 
 // The GitHub build (.github/workflows/android.yml) passes its build number and the signing key
-// through the environment. A local build has neither and stays a debug-signed version 0, which
-// the in-app update check (src/native/update.tsx) ignores.
-def appVersionCode = (System.getenv('APP_VERSION_CODE') ?: '0') as Integer
+// through the environment. A local build has neither: it is debug-signed with version code 1
+// (Android needs a positive number), and its web bundle carries build number 0, for which the
+// in-app update check (src/native/update.tsx) stays off.
+def appVersionCode = Math.max(1, (System.getenv('APP_VERSION_CODE') ?: '1') as Integer)
 def appVersionName = System.getenv('APP_VERSION_NAME') ?: '0.0-local'
 def keystorePath = System.getenv('ANDROID_KEYSTORE_FILE')
 

@@ -4,4 +4,6 @@
     <string name="title_activity_main">Корзина</string>
     <string name="package_name">io.github.andyly00.korzina</string>
     <string name="custom_url_scheme">io.github.andyly00.korzina</string>
+    <string name="widget_description">Что осталось купить в первом списке</string>
+    <string name="widget_empty">Откройте приложение, чтобы показать список</string>
 </resources>

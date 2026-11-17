@@ -214,7 +214,7 @@
 .text-action { display: inline-flex; align-items: center; gap: 5px; padding: 6px 2px; border: 0; background: transparent; color: var(--tomato); font-size: 12px; font-weight: 700; }
 .text-action svg { width: 15px; height: 15px; }
 .shopping-lists { display: flex; flex-direction: column; gap: 10px; }
-.list-card { position: relative; display: flex; min-height: 119px; flex-direction: column; align-items: flex-start; padding: 13px 15px 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 17px; background: var(--white); color: var(--ink); text-align: left; transition: transform 140ms ease, border-color 140ms ease; }
+.list-card { position: relative; display: flex; min-height: 119px; flex-direction: column; align-items: stretch; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 17px; background: var(--white); color: var(--ink); text-align: left; transition: transform 140ms ease, border-color 140ms ease; }
 .list-card:active { transform: scale(0.99); }
 .list-card-top { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-bottom: 3px; }
 .list-symbol { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 9px; background: var(--green-soft); color: var(--green); }
@@ -238,7 +238,7 @@
 .tip-mark svg { width: 13px; height: 13px; }
 .home-tip p { margin: 0; color: var(--ink); font-size: 11px; line-height: 1.45; }
 
-.bottom-nav { position: absolute; z-index: 10; right: 0; bottom: var(--mobile-safe-area-height); left: 0; display: grid; height: 61px; grid-template-columns: repeat(4, 1fr); padding: 4px 9px 2px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 95%, transparent); backdrop-filter: blur(12px); }
+.bottom-nav { position: absolute; z-index: 10; right: 0; bottom: var(--mobile-safe-area-height); left: 0; display: grid; height: 61px; grid-template-columns: repeat(5, 1fr); padding: 4px 6px 2px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 95%, transparent); backdrop-filter: blur(12px); }
 .nav-button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; background: transparent; color: var(--muted); }
 .nav-button > span { display: grid; width: 30px; height: 27px; place-items: center; border-radius: 11px; }
 .nav-button svg { width: 17px; height: 17px; }
@@ -323,3 +323,93 @@
   .welcome-block { margin-bottom: 20px; }
   .list-card { min-height: 108px; }
 }
+
+/* --- Lists: cards, badges, ordering ------------------------------------------------------------ */
+.list-card-main { display: flex; width: 100%; min-height: 119px; flex: 1; flex-direction: column; align-items: flex-start; padding: 13px 15px 12px; border: 0; background: transparent; color: var(--ink); text-align: left; }
+.list-card-menu { position: absolute; right: 6px; bottom: 4px; display: grid; width: 34px; height: 30px; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--muted); }
+.list-card-menu:hover { background: var(--green-soft); color: var(--green); }
+.list-card-menu svg { width: 16px; height: 16px; }
+.list-card .mini-progress { width: calc(100% - 40px); }
+.list-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 2px; }
+.list-heading-row + .list-badges { margin: -8px 0 14px 49px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 10px; font-weight: 650; white-space: nowrap; }
+.badge svg { width: 11px; height: 11px; }
+.badge-alert { background: color-mix(in srgb, var(--tomato) 15%, transparent); color: var(--tomato); }
+.sort-chip-active { border-color: var(--green); background: var(--green-soft); }
+.complete-button { width: 100%; margin-top: 16px; }
+.drag-handle { display: grid; width: 22px; height: 40px; flex: 0 0 auto; place-items: center; color: var(--muted); cursor: grab; user-select: none; }
+.drag-handle svg { width: 15px; height: 15px; }
+.sortable-row { position: relative; background: var(--paper); }
+.sortable-dragging { z-index: 5; border-radius: 12px; box-shadow: 0 10px 26px #1a29152b; }
+.product-row .product-note:empty { display: none; }
+
+/* --- Quick add suggestions --------------------------------------------------------------------- */
+.suggestion-row { position: absolute; right: 0; bottom: 100%; left: 0; display: flex; gap: 6px; padding: 8px 18px; overflow-x: auto; scrollbar-width: none; background: color-mix(in srgb, var(--paper) 94%, transparent); }
+.suggestion-row::-webkit-scrollbar { display: none; }
+.suggestion-chip { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink); font-size: 12px; font-weight: 650; white-space: nowrap; }
+.suggestion-chip svg { width: 13px; height: 13px; color: var(--green); }
+.suggestion-chip small { color: var(--muted); font-size: 10px; font-weight: 500; }
+
+/* --- Toast with undo --------------------------------------------------------------------------- */
+.toast > span { flex: 1; }
+.toast .toast-undo { width: auto; height: 28px; padding: 0 10px; border-radius: 9px; background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 750; }
+
+/* --- Sheets ------------------------------------------------------------------------------------ */
+.sheet-text { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.5; }
+.sheet-section { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.sheet-section .settings-label { margin: 0; }
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { display: inline-flex; align-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink); font-size: 12px; font-weight: 650; }
+.chip > span,
+.chip > button:first-child { display: inline-flex; align-items: center; gap: 5px; padding: 7px 4px 7px 11px; border: 0; background: transparent; color: inherit; font: inherit; }
+.chip > button:last-child:not(:first-child) { display: grid; width: 28px; height: 30px; place-items: center; border: 0; background: transparent; color: var(--muted); }
+.chip svg { width: 12px; height: 12px; }
+.chip small { color: var(--muted); font-size: 10px; }
+.chip-fixed > span { padding-right: 11px; color: var(--muted); }
+.chip-button { height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--green); font-size: 12px; font-weight: 700; }
+.action-list { gap: 7px; }
+.action-row { min-height: 54px; }
+.action-danger { color: var(--tomato); }
+.action-danger .setting-icon { background: color-mix(in srgb, var(--tomato) 13%, transparent); color: var(--tomato); }
+.pick-row { display: flex; min-height: 50px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); color: var(--ink); font-size: 13px; font-weight: 650; text-align: left; }
+.pick-row small { color: var(--muted); font-size: 11px; font-weight: 500; }
+.pick-active { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+.secondary-button { display: inline-flex; min-height: 43px; align-items: center; justify-content: center; gap: 7px; padding: 0 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--white); color: var(--green); font-size: 13px; font-weight: 700; }
+.secondary-button:disabled { opacity: 0.5; }
+.secondary-button svg { width: 15px; height: 15px; }
+.danger-button { display: inline-flex; min-height: 45px; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 13px; background: var(--tomato); color: white; font-size: 13px; font-weight: 700; }
+.danger-button:disabled { opacity: 0.5; }
+.inline-form { display: flex; align-items: flex-end; gap: 8px; }
+.inline-form .form-label { min-width: 0; flex: 1; }
+.inline-form .secondary-button { height: 45px; flex: 0 0 auto; }
+.inline-link { margin-left: 6px; padding: 0; border: 0; background: transparent; color: var(--tomato); font-size: 11px; font-weight: 650; }
+.form-label textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; outline: none; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; line-height: 1.45; resize: vertical; }
+.form-label textarea:focus { border-color: var(--green); }
+.share-link { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--green-soft); }
+.share-link > span { overflow-wrap: anywhere; color: var(--ink); font-size: 12px; font-weight: 600; }
+.share-link > small { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.share-link-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.member-row { display: flex; align-items: center; gap: 8px; padding: 9px 2px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 13px; }
+.member-row span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.member-row small { color: var(--muted); font-size: 11px; }
+.member-row svg { width: 15px; height: 15px; color: var(--green); }
+.order-list { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; }
+.order-row { display: flex; min-height: 44px; align-items: center; gap: 6px; padding-right: 12px; border-bottom: 1px solid var(--line); background: var(--white); color: var(--ink); font-size: 13px; font-weight: 600; }
+.order-dragging { border-radius: 10px; background: var(--green-soft); }
+.google-block { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.divider-text { display: flex; width: 100%; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
+.divider-text::before,
+.divider-text::after { height: 1px; flex: 1; background: var(--line); content: ""; }
+.google-slot { min-height: 44px; }
+.google-button { width: 100%; color: var(--ink); }
+.google-mark { color: #4285f4; font-size: 16px; font-weight: 800; }
+
+/* --- Settings ---------------------------------------------------------------------------------- */
+.settings-stack { display: flex; flex-direction: column; gap: 8px; }
+.settings-buttons { display: flex; justify-content: space-between; gap: 8px; }
+.settings-buttons .destructive-button { flex: 1; }
+.setting-row > svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--muted); }
+.setting-warning { background: color-mix(in srgb, var(--tomato) 14%, transparent); color: var(--tomato); }
+.recipe-row { padding: 0 2px 0 0; }
+.recipe-row .favorite-row-main small { overflow: hidden; max-width: 210px; text-overflow: ellipsis; white-space: nowrap; }
+.nav-button small { font-size: 8.5px; }

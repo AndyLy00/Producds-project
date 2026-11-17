@@ -1,6 +1,6 @@
 // Shared code of the Vercel functions in this folder: MongoDB access, passwords, session tokens.
 // Files starting with "_" are not exposed as routes.
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { MongoClient } from "mongodb";
 
@@ -12,7 +12,7 @@ const TOKEN_LIFETIME_SECONDS = 180 * 24 * 60 * 60;
 // origin may be allowed.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
   "Access-Control-Max-Age": "86400",
 };
@@ -77,6 +77,10 @@ export async function database() {
     db.collection("users").createIndex({ email: 1 }, { unique: true }),
     // MongoDB removes attempt counters by itself once their window has passed.
     db.collection("attempts").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("codes").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("invites").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("handoffs").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("lists").createIndex({ members: 1, serverUpdatedAt: 1 }),
   ]);
   await indexesReady;
   return db;
@@ -128,35 +132,141 @@ function sign(payload) {
   return createHmac("sha256", requiredEnv("AUTH_SECRET")).update(payload).digest("base64url");
 }
 
-// Compact signed token: base64url(JSON payload) + "." + HMAC-SHA256 signature.
-export function issueToken(userId) {
-  const payload = Buffer.from(JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + TOKEN_LIFETIME_SECONDS })).toString("base64url");
+function sameText(a, b) {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+// Compact signed token: base64url(JSON payload) + "." + HMAC-SHA256 signature. `tv` is the
+// user's token version: changing or resetting the password bumps it and so signs out every
+// other device.
+export function issueToken(user) {
+  const payload = Buffer.from(
+    JSON.stringify({ sub: user._id, tv: user.tokenVersion ?? 0, exp: Math.floor(Date.now() / 1000) + TOKEN_LIFETIME_SECONDS }),
+  ).toString("base64url");
   return `${payload}.${sign(payload)}`;
 }
 
-export function authenticatedUserId(request) {
+// The signed-in user, or 401.
+export async function authenticate(request) {
   const token = /^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
   const [payload, signature] = token.split(".");
-  if (payload && signature) {
-    const expected = Buffer.from(sign(payload));
-    const actual = Buffer.from(signature);
-    if (expected.length === actual.length && timingSafeEqual(expected, actual)) {
-      try {
-        const { sub, exp } = JSON.parse(Buffer.from(payload, "base64url").toString());
-        if (typeof sub === "string" && exp > Date.now() / 1000) return sub;
-      } catch {
-        // Reported below.
-      }
+  if (payload && signature && sameText(sign(payload), signature)) {
+    let claims = null;
+    try {
+      claims = JSON.parse(Buffer.from(payload, "base64url").toString());
+    } catch {
+      // Reported below.
+    }
+    if (claims && typeof claims.sub === "string" && claims.exp > Date.now() / 1000) {
+      const user = await (await database()).collection("users").findOne({ _id: claims.sub });
+      if (user && (user.tokenVersion ?? 0) === claims.tv) return user;
     }
   }
   throw new HttpError(401, "Войдите в аккаунт заново.");
 }
 
-export function parseCredentials(body) {
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  const password = typeof body.password === "string" ? body.password : "";
+// What the app keeps about the signed-in account.
+export function account(user) {
+  return { token: issueToken(user), email: user.email, verified: user.emailVerified === true, hasPassword: Boolean(user.passwordHash) };
+}
+
+export function parseEmail(value) {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Укажите корректный адрес почты.");
+  return email;
+}
+
+export function parsePassword(value) {
+  const password = typeof value === "string" ? value : "";
   if (password.length < 8) throw new HttpError(400, "Пароль должен быть не короче 8 символов.");
   if (password.length > 200) throw new HttpError(400, "Слишком длинный пароль.");
-  return { email, password };
+  return password;
+}
+
+export function parseCredentials(body) {
+  return { email: parseEmail(body.email), password: parsePassword(body.password) };
+}
+
+export function randomToken(bytes = 24) {
+  return randomBytes(bytes).toString("base64url");
+}
+
+export function sha256(value) {
+  return createHash("sha256").update(value).digest("base64url");
+}
+
+// --- Email -------------------------------------------------------------------------------------
+// Sent through Resend (https://resend.com): RESEND_API_KEY and EMAIL_FROM, e.g.
+// "Корзина <no-reply@example.com>" on a domain verified in Resend. With EMAIL_TRANSPORT=memory
+// (tests) messages are only collected in globalThis.korzinaOutbox.
+
+export function emailEnabled() {
+  return process.env.EMAIL_TRANSPORT === "memory" || Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+}
+
+export async function sendEmail(to, subject, body) {
+  if (process.env.EMAIL_TRANSPORT === "memory") {
+    (globalThis.korzinaOutbox ??= []).push({ to, subject, text: body });
+    return;
+  }
+  if (!emailEnabled()) throw new HttpError(503, "Отправка писем пока не настроена.");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [to], subject, text: body }),
+  });
+  if (!response.ok) {
+    console.error("Resend", response.status, await response.text());
+    throw new HttpError(502, "Не удалось отправить письмо. Попробуйте позже.");
+  }
+}
+
+// --- One-time codes (email verification, password reset) ---------------------------------------
+
+const CODE_LIFETIME_MINUTES = 15;
+const CODE_ATTEMPTS = 5;
+
+function codeHash(purpose, userId, code) {
+  return sign(`code:${purpose}:${userId}:${code}`);
+}
+
+// Creates a new 6-digit code, replacing an earlier one for the same purpose.
+export async function issueCode(purpose, userId) {
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  await (await database()).collection("codes").replaceOne(
+    { _id: `${purpose}:${userId}` },
+    { hash: codeHash(purpose, userId, code), attempts: 0, expiresAt: new Date(Date.now() + CODE_LIFETIME_MINUTES * 60_000) },
+    { upsert: true },
+  );
+  return code;
+}
+
+// Consumes the code when it matches. A code allows only a few wrong guesses.
+export async function useCode(purpose, userId, code) {
+  const codes = (await database()).collection("codes");
+  const stored = await codes.findOne({ _id: `${purpose}:${userId}` });
+  if (!stored || stored.expiresAt < new Date() || stored.attempts >= CODE_ATTEMPTS) {
+    throw new HttpError(400, "Код устарел. Запросите новый.");
+  }
+  if (typeof code !== "string" || !sameText(codeHash(purpose, userId, code.trim()), stored.hash)) {
+    await codes.updateOne({ _id: stored._id }, { $inc: { attempts: 1 } });
+    throw new HttpError(400, "Неверный код.");
+  }
+  await codes.deleteOne({ _id: stored._id });
+}
+
+export async function sendVerificationCode(user) {
+  const code = await issueCode("verify", user._id);
+  await sendEmail(
+    user.email,
+    `Код подтверждения: ${code}`,
+    `Здравствуйте!\n\nВаш код для подтверждения почты в приложении «Корзина»: ${code}\n\nКод действует ${CODE_LIFETIME_MINUTES} минут. Если вы не создавали аккаунт, просто проигнорируйте это письмо.`,
+  );
+}
+
+// Origin of the site, used in links sent to people.
+export function appOrigin(request) {
+  return process.env.APP_ORIGIN || new URL(request.url).origin;
 }
