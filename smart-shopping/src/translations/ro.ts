@@ -418,6 +418,11 @@ const ro: Record<string, string> = {
   "Сахар": "Zahăr",
   "Список пуст": "Lista este goală",
 
+  // Ads (src/ads.ts)
+  "РЕКЛАМА": "RECLAME",
+  "Настройки рекламы": "Setări reclame",
+  "Согласие на персонализированную рекламу Google": "Acordul pentru reclame Google personalizate",
+
   // Linella prices
   "≈ {total} в Linella": "≈ {total} la Linella",
   "осталось ≈ {left}": "rămas ≈ {left}",

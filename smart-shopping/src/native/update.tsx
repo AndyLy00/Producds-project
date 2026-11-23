@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 import { t } from "../i18n";
 
 declare const __APP_VERSION_CODE__: number;
+// "play" in the Google Play build: Play updates the app itself, and its rules forbid apps that
+// update themselves any other way.
+declare const __APP_STORE__: string;
+const fromPlay = typeof __APP_STORE__ === "string" && __APP_STORE__ === "play";
 
 const LATEST_RELEASE = "https://api.github.com/repos/AndyLy00/Producds-project/releases/latest";
 const DISMISSED_KEY = "korzina.update.dismissed";
@@ -41,7 +45,7 @@ export function UpdateBanner() {
 
   useEffect(() => {
     // A local build has no build number to compare with.
-    if (__APP_VERSION_CODE__ === 0) return;
+    if (__APP_VERSION_CODE__ === 0 || fromPlay) return;
     let lastCheck = 0;
     let active = true;
     const check = () => {

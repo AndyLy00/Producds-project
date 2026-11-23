@@ -1,11 +1,13 @@
 // Settings: theme, account, stores and own categories.
-import { BookmarkIcon, ChevronRightIcon, GlobeIcon, HomeIcon, EnvelopeClosedIcon, ExitIcon, LockClosedIcon, MixIcon, MoonIcon, PersonIcon, PlusIcon, SunIcon, TrashIcon } from "@radix-ui/react-icons";
+import { BookmarkIcon, ChevronRightIcon, EyeOpenIcon, GlobeIcon, HomeIcon, EnvelopeClosedIcon, ExitIcon, LockClosedIcon, MixIcon, MoonIcon, PersonIcon, PlusIcon, SunIcon, TrashIcon } from "@radix-ui/react-icons";
 import { API_ORIGIN } from "../api-origin";
+import { useAdPrivacyOptions } from "../ads";
 import { alive } from "../model";
 import type { ShoppingApp } from "./useShoppingApp";
 import { languages, t } from "../i18n";
 
 export function SettingsTab({ app }: { app: ShoppingApp }) {
+  const adPrivacy = useAdPrivacyOptions();
   const { data, cloud } = app;
   const syncLabel = { idle: t("Подключение"), syncing: t("Сохранение"), synced: t("Сохранено"), error: t("Нет связи") }[cloud.status];
   const customCategories = alive(data.categories);
@@ -43,6 +45,12 @@ export function SettingsTab({ app }: { app: ShoppingApp }) {
     <section className="settings-group"><p className="settings-label">{t("КАТЕГОРИИ")}</p>
       <button className="setting-row" onClick={app.openCategories}><span className="setting-icon"><BookmarkIcon /></span><span><b>{t("Свои категории")}</b><small>{customCategories.length ? customCategories.map((category) => category.name).join(", ") : t("Добавьте свои группы продуктов")}</small></span><ChevronRightIcon /></button>
     </section>
+
+    {adPrivacy.required && (
+      <section className="settings-group"><p className="settings-label">{t("РЕКЛАМА")}</p>
+        <button className="setting-row" onClick={adPrivacy.open}><span className="setting-icon"><EyeOpenIcon /></span><span><b>{t("Настройки рекламы")}</b><small>{t("Согласие на персонализированную рекламу Google")}</small></span><ChevronRightIcon /></button>
+      </section>
+    )}
 
     <div className="settings-note">{cloud.email ? t("Списки хранятся на этом устройстве и в вашем аккаунте. Без интернета приложение продолжает работать, изменения сохранятся при следующем подключении.") : t("Сейчас покупки сохраняются только на этом устройстве. Войдите в аккаунт, чтобы они не потерялись и были доступны на других устройствах.")}</div>
     <a className="settings-link" href={`${API_ORIGIN}/privacy?lang=${app.lang}`} target="_blank" rel="noopener">{t("Политика конфиденциальности")}</a>

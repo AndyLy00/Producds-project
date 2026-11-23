@@ -498,3 +498,6 @@
 .price-total { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--green); font-size: 12px; font-weight: 700; }
 .price-total span:last-child:not(:first-child) { color: var(--muted); font-weight: 600; }
 .shop-price { display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; }
+
+/* Room for the Android app's ad banner above the navigation (src/ads.ts). */
+.home-screen .bottom-spacer { height: calc(20px + var(--ad-height, 0px)); }

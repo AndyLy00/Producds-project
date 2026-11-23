@@ -18,6 +18,7 @@
     "apk": "npm run build:android && cd android && \"./gradlew\" assembleDebug"
   },
   "dependencies": {
+    "@capacitor-community/admob": "8.3.0",
     "@capacitor/android": "8.6.2",
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.6.2",

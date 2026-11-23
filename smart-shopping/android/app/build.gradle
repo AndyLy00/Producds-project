@@ -7,6 +7,9 @@ apply plugin: 'com.android.application'
 def appVersionCode = Math.max(1, (System.getenv('APP_VERSION_CODE') ?: '1') as Integer)
 def appVersionName = System.getenv('APP_VERSION_NAME') ?: '0.0-local'
 def keystorePath = System.getenv('ANDROID_KEYSTORE_FILE')
+// AdMob app id (src/ads.ts). The SDK refuses to start without one, so builds without our own id
+// get Google's published test id; they show no ads anyway, as they have no ad unit id.
+def admobAppId = System.getenv('ADMOB_APP_ID') ?: 'ca-app-pub-3940256099942544~3347511713'
 
 android {
     namespace = "io.github.andyly00.korzina"
@@ -17,6 +20,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
         versionName appVersionName
+        manifestPlaceholders = [admobAppId: admobAppId]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

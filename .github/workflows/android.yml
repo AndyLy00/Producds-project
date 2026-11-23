@@ -27,6 +27,10 @@ jobs:
     env:
       APP_VERSION_CODE: ${{ github.run_number }}
       APP_VERSION_NAME: 1.0.${{ github.run_number }}
+      # AdMob (src/ads.ts), set under Settings → Secrets and variables → Actions → Variables.
+      # Without ADMOB_BANNER_ID the app shows no ads.
+      ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+      ADMOB_BANNER_ID: ${{ vars.ADMOB_BANNER_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -70,6 +74,25 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/korzina.apk"
+
+      # The same app for Google Play: an App Bundle, without the self-update banner that Play's
+      # rules forbid. Play Console takes it from the run's artifacts.
+      - name: Build the Google Play bundle
+        env:
+          APP_STORE: play
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          npm run build:android
+          cd android
+          ./gradlew bundleRelease --no-daemon
+          cp app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/korzina-play-${APP_VERSION_CODE}.aab"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: korzina-play-${{ github.run_number }}
+          path: ${{ runner.temp }}/korzina-play-${{ github.run_number }}.aab
+          retention-days: 90
 
       - name: Publish the release
         env:

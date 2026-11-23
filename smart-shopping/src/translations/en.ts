@@ -418,6 +418,11 @@ const en: Record<string, string> = {
   "Сахар": "Sugar",
   "Список пуст": "The list is empty",
 
+  // Ads (src/ads.ts)
+  "РЕКЛАМА": "ADS",
+  "Настройки рекламы": "Ad settings",
+  "Согласие на персонализированную рекламу Google": "Consent to personalised Google ads",
+
   // Linella prices
   "≈ {total} в Linella": "≈ {total} at Linella",
   "осталось ≈ {left}": "≈ {left} left",

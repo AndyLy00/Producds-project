@@ -1,5 +1,7 @@
 // The tabs shown when no list is open: lists, favorites, recipes, history and settings.
 import { ArchiveIcon, BackpackIcon, CalendarIcon, ChevronRightIcon, ClockIcon, DotsHorizontalIcon, GearIcon, HomeIcon, PlayIcon, PlusIcon, ReaderIcon, StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
+import type { CSSProperties } from "react";
+import { useAdBanner } from "../ads";
 import { MobileScroll } from "../mobile";
 import { alive, formatMinutes, progress, stepsOf, toProduct, totalMinutes } from "../model";
 import { SettingsTab } from "./SettingsTab";
@@ -83,10 +85,12 @@ function HistoryTab({ app }: { app: ShoppingApp }) {
 
 export function HomeScreen({ app }: { app: ShoppingApp }) {
   const { tab, setTab } = app;
+  // The Android app's ad banner sits above the navigation; a sheet hides it (src/ads.ts).
+  const adHeight = useAdBanner(app.sheet === null);
   return (
     <>
       <MobileScroll className="app-screen">
-        <main className="home-screen screen-content">
+        <main className="home-screen screen-content" style={{ "--ad-height": `${adHeight}px` } as CSSProperties}>
           <header className="brand-header">
             <div className="brand-home"><span className="brand-mark" aria-hidden="true"><BackpackIcon /></span><span>{t("Корзина")}</span></div>
             <button className="icon-button header-action" aria-label={t("Настройки")} onClick={() => setTab("settings")}><GearIcon /></button>
