@@ -4,7 +4,7 @@
 // was last changed on any device; removing an entity leaves a tombstone (`deleted: true`) so the
 // removal reaches the other copies. Copies are merged per entity (shared/merge.js), which is why
 // every change below stamps exactly the entities it touches.
-import { mergeLists, mergeProfile } from "../shared/merge.js";
+import { mergeLists, mergeProfile, pruneList, pruneProfile } from "../shared/merge.js";
 
 export const defaultCategories = ["Овощи и фрукты", "Мясо и рыба", "Молочные продукты", "Бакалея", "Напитки", "Для дома", "Сладости и снеки"];
 export const units = ["шт.", "кг", "г", "л", "мл", "уп."];
@@ -74,7 +74,12 @@ export function mergeData(local: ShoppingData, remote: { lists?: ShoppingList[];
   const revoked = new Set(remote.revoked ?? []);
   const lists = mergeLists(local.lists, remote.lists ?? []).filter((list) => !revoked.has(list.id));
   const profile = remote.profile ? mergeProfile(profileOf(local), remote.profile) : profileOf(local);
-  return { ...local, ...profile, lists, sharing: remote.sharing ?? local.sharing };
+  return pruneData({ ...local, ...profile, lists, sharing: remote.sharing ?? local.sharing });
+}
+
+// Drops tombstones old enough that every copy has seen them (shared/merge.js).
+export function pruneData(data: ShoppingData, now = Date.now()): ShoppingData {
+  return { ...data, ...pruneProfile(profileOf(data), now), lists: data.lists.map((list) => pruneList(list, now)) };
 }
 
 export function guessCategory(name: string) {
@@ -267,7 +272,7 @@ export function migrate(raw: unknown): ShoppingData | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Partial<ShoppingData> & { history?: LegacyList[]; darkMode?: boolean };
   if (!Array.isArray(value.lists)) return null;
-  if (value.settings) return { ...emptyData(), ...value, sharing: value.sharing ?? {} } as ShoppingData;
+  if (value.settings) return pruneData({ ...emptyData(), ...value, sharing: value.sharing ?? {} } as ShoppingData);
   return {
     ...emptyData(),
     lists: [

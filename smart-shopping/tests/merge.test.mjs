@@ -1,7 +1,7 @@
 // Merging rules shared by the app and the server (shared/merge.js).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mergeEntities, mergeList, mergeLists, mergeProfile } from "../shared/merge.js";
+import { dropOldTombstones, mergeEntities, mergeList, mergeLists, mergeProfile, pruneList, pruneProfile } from "../shared/merge.js";
 
 const entity = (id, updatedAt, extra = {}) => ({ id, updatedAt, ...extra });
 
@@ -34,4 +34,13 @@ test("profile settings follow the later change", () => {
   const merged = mergeProfile({ ...empty, settings: { darkMode: true, updatedAt: 5 } }, { ...empty, settings: { darkMode: false, updatedAt: 3 }, recipes: [entity("r", 1)] });
   assert.equal(merged.settings.darkMode, true);
   assert.deepEqual(merged.recipes, [entity("r", 1)]);
+});
+
+test("old tombstones are dropped, recent ones and live entities stay", () => {
+  const now = 100 * 86_400_000;
+  const day = 86_400_000;
+  const kept = dropOldTombstones([entity("live", 1), entity("recent", now - day, { deleted: true }), entity("old", now - 61 * day, { deleted: true })], now);
+  assert.deepEqual(kept.map((value) => value.id), ["live", "recent"]);
+  assert.deepEqual(pruneList({ id: "L", updatedAt: now, deleted: true, items: [entity("a", 1)] }, now).items, []);
+  assert.deepEqual(pruneProfile({ stores: [entity("s", 1, { deleted: true })], templates: [], recipes: [], categories: [], settings: {} }, now).stores, []);
 });

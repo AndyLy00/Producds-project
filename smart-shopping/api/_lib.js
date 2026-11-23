@@ -93,18 +93,22 @@ function attemptCounter(subject, windowSeconds) {
   return { _id: `${subject}:${window}`, expiresAt: new Date((window + 1) * windowSeconds * 1000) };
 }
 
-// Throws 429 when the subject has used up its attempts for the current window.
-export async function assertNotBlocked(subject, limit, windowSeconds) {
+// Counts one attempt and throws 429 when it is over the limit of the current window. Counting
+// and checking are one atomic step, so many requests sent at once cannot all slip under the limit.
+export async function takeAttempt(subject, limit, windowSeconds) {
   const { _id, expiresAt } = attemptCounter(subject, windowSeconds);
-  const counter = await (await database()).collection("attempts").findOne({ _id });
-  if ((counter?.count ?? 0) < limit) return;
+  const counter = await (await database())
+    .collection("attempts")
+    .findOneAndUpdate({ _id }, { $inc: { count: 1 }, $setOnInsert: { expiresAt } }, { upsert: true, returnDocument: "after" });
+  if ((counter?.count ?? 1) <= limit) return;
   const minutes = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
   throw new HttpError(429, `Слишком много попыток. Попробуйте снова через ${minutes} мин.`);
 }
 
-export async function recordAttempt(subject, windowSeconds) {
-  const { _id, expiresAt } = attemptCounter(subject, windowSeconds);
-  await (await database()).collection("attempts").updateOne({ _id }, { $inc: { count: 1 }, $setOnInsert: { expiresAt } }, { upsert: true });
+// Takes back an attempt that turned out to be legitimate (a correct password).
+export async function returnAttempt(subject, windowSeconds) {
+  const { _id } = attemptCounter(subject, windowSeconds);
+  await (await database()).collection("attempts").updateOne({ _id, count: { $gt: 0 } }, { $inc: { count: -1 } });
 }
 
 export async function clearAttempts(subject, windowSeconds) {

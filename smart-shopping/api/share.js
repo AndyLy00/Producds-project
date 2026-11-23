@@ -6,7 +6,6 @@
 import {
   HttpError,
   appOrigin,
-  assertNotBlocked,
   authenticate,
   database,
   json,
@@ -14,9 +13,9 @@ import {
   preflight,
   randomToken,
   readJson,
-  recordAttempt,
   route,
   sendEmail,
+  takeAttempt,
 } from "./_lib.js";
 
 const INVITE_DAYS = 7;
@@ -30,8 +29,7 @@ async function memberList(db, listId, user) {
 const actions = {
   async invite(request, body, user, db) {
     const list = await memberList(db, body.listId, user);
-    await assertNotBlocked(`invite:${user._id}`, 30, 3600);
-    await recordAttempt(`invite:${user._id}`, 3600);
+    await takeAttempt(`invite:${user._id}`, 30, 3600);
     const token = randomToken();
     await db.collection("invites").insertOne({
       _id: token,

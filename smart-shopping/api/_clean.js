@@ -1,17 +1,32 @@
 // Accepts only the known fields of what the app sends, with type checks and size caps, so that
 // the database never stores arbitrary client data. Shapes: src/model.ts.
+import { dropOldTombstones } from "../shared/merge.js";
 
 const text = (value, max) => (typeof value === "string" ? value.slice(0, max) : "");
 const time = (value) => (Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0);
 const validId = (value) => typeof value === "string" && value.length > 0 && value.length <= 100;
 const tombstone = (entity) => (entity.deleted === true ? { deleted: true } : {});
 
+// The newest copy of an entity wins a merge, so a change stamped far in the future (a phone with
+// a wrong clock, or someone sharing a list on purpose) would win against every later edit.
+// Stamps may run ahead of the server's clock only by this much.
+export const MAX_CLOCK_AHEAD = 5 * 60 * 1000;
+const stamp = (value) => Math.min(time(value), Date.now() + MAX_CLOCK_AHEAD);
+
 function many(values, max, clean) {
   return Array.isArray(values) ? values.filter((value) => value && typeof value === "object").slice(0, max).map(clean) : [];
 }
 
+// Up to `max` live entities plus up to `max` recent tombstones: removals can never push live
+// entities out, and tombstones older than TOMBSTONE_LIFETIME are dropped.
 function entities(values, max, clean) {
-  return many(values, max, (value) => value).filter((value) => validId(value.id)).map(clean);
+  if (!Array.isArray(values)) return [];
+  const valid = values.filter((value) => value && typeof value === "object" && validId(value.id));
+  const live = valid.filter((value) => value.deleted !== true).slice(0, max).map(clean);
+  const removed = dropOldTombstones(valid.filter((value) => value.deleted === true).map(clean))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, max);
+  return [...live, ...removed];
 }
 
 function product(value) {
@@ -31,7 +46,7 @@ export function cleanItem(value) {
     purchased: value.purchased === true,
     favorite: value.favorite === true,
     order: Number.isFinite(value.order) ? value.order : 0,
-    updatedAt: time(value.updatedAt),
+    updatedAt: stamp(value.updatedAt),
     ...tombstone(value),
   };
 }
@@ -42,7 +57,7 @@ export function cleanList(value) {
     id: value.id,
     name: text(value.name, 120),
     createdAt: time(value.createdAt),
-    updatedAt: time(value.updatedAt),
+    updatedAt: stamp(value.updatedAt),
     ...(value.completedAt ? { completedAt: time(value.completedAt) } : {}),
     ...(validId(value.storeId) ? { storeId: value.storeId } : {}),
     sortMode: value.sortMode === "manual" ? "manual" : "category",
@@ -60,14 +75,14 @@ export function cleanProfile(value) {
       id: store.id,
       name: text(store.name, 80),
       categoryOrder: many(store.categoryOrder, 60, (name) => name).filter((name) => typeof name === "string").map((name) => name.slice(0, 60)),
-      updatedAt: time(store.updatedAt),
+      updatedAt: stamp(store.updatedAt),
       ...tombstone(store),
     })),
     templates: entities(value.templates, 100, (template) => ({
       id: template.id,
       name: text(template.name, 120),
       items: many(template.items, 300, product),
-      updatedAt: time(template.updatedAt),
+      updatedAt: stamp(template.updatedAt),
       ...tombstone(template),
     })),
     recipes: entities(value.recipes, 300, (recipe) => ({
@@ -75,16 +90,16 @@ export function cleanProfile(value) {
       name: text(recipe.name, 120),
       note: text(recipe.note, 2000),
       ingredients: many(recipe.ingredients, 100, product),
-      updatedAt: time(recipe.updatedAt),
+      updatedAt: stamp(recipe.updatedAt),
       ...tombstone(recipe),
     })),
     categories: entities(value.categories, 60, (category) => ({
       id: category.id,
       name: text(category.name, 60),
-      updatedAt: time(category.updatedAt),
+      updatedAt: stamp(category.updatedAt),
       ...tombstone(category),
     })),
-    settings: { darkMode: settings.darkMode === true, updatedAt: time(settings.updatedAt) },
+    settings: { darkMode: settings.darkMode === true, updatedAt: stamp(settings.updatedAt) },
   };
 }
 

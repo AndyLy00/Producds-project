@@ -6,6 +6,31 @@
 // for every id, the copy changed last. A list is an entity whose `items` are entities too, so
 // two devices editing different products of one list both keep their changes.
 
+// A tombstone only has to outlive the copies that still hold the removed entity. After this long
+// it is dropped, so lists and profiles do not grow without end. A device that stayed offline for
+// longer may bring such an entity back; that is the price of keeping the data small.
+export const TOMBSTONE_LIFETIME = 60 * 24 * 60 * 60 * 1000;
+
+export function dropOldTombstones(entities = [], now = Date.now()) {
+  return entities.filter((entity) => !entity.deleted || entity.updatedAt > now - TOMBSTONE_LIFETIME);
+}
+
+// Old tombstones inside a list and inside a profile. List tombstones themselves are kept (a
+// removed list is one small document), but the products of a removed list are of no use.
+export function pruneList(list, now = Date.now()) {
+  return { ...list, items: list.deleted ? [] : dropOldTombstones(list.items, now) };
+}
+
+export function pruneProfile(profile, now = Date.now()) {
+  return {
+    ...profile,
+    stores: dropOldTombstones(profile.stores, now),
+    templates: dropOldTombstones(profile.templates, now),
+    recipes: dropOldTombstones(profile.recipes, now),
+    categories: dropOldTombstones(profile.categories, now),
+  };
+}
+
 function newer(a, b) {
   if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? a : b;
   if (Boolean(a.deleted) !== Boolean(b.deleted)) return a.deleted ? a : b;

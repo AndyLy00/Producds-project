@@ -7,7 +7,11 @@
 // `since`, the merged profile, and the ids of sent lists the account no longer has access to.
 import { HttpError, authenticate, database, json, preflight, readJson, route } from "./_lib.js";
 import { cleanList, cleanProfile, emptyProfile } from "./_clean.js";
-import { mergeList, mergeProfile } from "../shared/merge.js";
+import { mergeList, mergeProfile, pruneList, pruneProfile } from "../shared/merge.js";
+
+// Merging also drops tombstones that have outlived their purpose (shared/merge.js).
+const mergeStoredList = (stored, incoming) => pruneList(mergeList(stored, incoming));
+const mergeStoredProfile = (stored, incoming) => pruneProfile(mergeProfile(stored, incoming));
 
 // Changes saved by another server instance just before `since` must not be missed; merging the
 // same list twice is harmless.
@@ -59,18 +63,18 @@ export const POST = route(async (request) => {
       revoked.push(list.id);
       continue;
     }
-    await saveMerged(lists, { _id: list.id, members: user._id }, list, mergeList, {
+    await saveMerged(lists, { _id: list.id, members: user._id }, list, mergeStoredList, {
       _id: list.id,
       ownerId: user._id,
       members: [user._id],
-      data: list,
+      data: pruneList(list),
     });
   }
 
   const profiles = db.collection("profiles");
   const incomingProfile = cleanProfile(body.profile);
   const profile = incomingProfile
-    ? await saveMerged(profiles, { _id: user._id }, incomingProfile, mergeProfile, { _id: user._id, data: incomingProfile })
+    ? await saveMerged(profiles, { _id: user._id }, incomingProfile, mergeStoredProfile, { _id: user._id, data: incomingProfile })
     : ((await profiles.findOne({ _id: user._id }))?.data ?? emptyProfile());
 
   const changed = await lists.find({ members: user._id, serverUpdatedAt: { $gt: since - CLOCK_MARGIN } }).toArray();

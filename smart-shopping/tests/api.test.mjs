@@ -132,13 +132,14 @@ test("lists need a valid session", { skip }, async () => {
 
 test("edits made on two devices at once are merged instead of overwritten", { skip }, async () => {
   const { token } = await register("vera@example.com");
-  const base = list("L1", "Дом", 10, [item("a", "Хлеб", 10), item("b", "Молоко", 10)]);
+  const t = Date.now() - 60_000;
+  const base = list("L1", "Дом", t + 10, [item("a", "Хлеб", t + 10), item("b", "Молоко", t + 10)]);
   const first = await call(api.sync, { lists: [base], profile: profile(), since: 0 }, { token });
   assert.equal(first.status, 200);
 
   // Phone renames the list and buys bread; laptop (still holding the old copy) deletes milk and adds eggs.
-  const phone = { ...base, name: "Дом и дача", updatedAt: 20, items: [item("a", "Хлеб", 21, { purchased: true }), item("b", "Молоко", 10)] };
-  const laptop = { ...base, items: [item("a", "Хлеб", 10), item("b", "Молоко", 22, { deleted: true }), item("c", "Яйца", 23)] };
+  const phone = { ...base, name: "Дом и дача", updatedAt: t + 20, items: [item("a", "Хлеб", t + 21, { purchased: true }), item("b", "Молоко", t + 10)] };
+  const laptop = { ...base, items: [item("a", "Хлеб", t + 10), item("b", "Молоко", t + 22, { deleted: true }), item("c", "Яйца", t + 23)] };
   await call(api.sync, { lists: [phone], profile: null, since: first.body.now }, { token });
   const merged = await call(api.sync, { lists: [laptop], profile: null, since: 0 }, { token });
   const saved = merged.body.lists.find((entry) => entry.id === "L1");
@@ -208,4 +209,80 @@ test("deleting the account removes it and keeps shared lists for the others", { 
   assert.equal((await auth({ action: "login", email: "leaving@example.com", password: "my-password" })).status, 401);
   assert.equal(await db.collection("lists").countDocuments({ _id: "D2" }), 0);
   assert.deepEqual((await call(api.sync, { lists: [], since: 0 }, { token: friend })).body.lists.map((entry) => entry.name), ["Общий"]);
+});
+
+test("wrong passwords sent all at once are still limited", { skip }, async () => {
+  await register("rush@example.com", "correct-horse");
+  const guesses = await Promise.all(
+    Array.from({ length: 20 }, (_, index) => auth({ action: "login", email: "rush@example.com", password: `guess-${index}-x` })),
+  );
+  const checked = guesses.filter((result) => result.status === 401).length;
+  assert.ok(checked <= 5, `only 5 passwords may be checked, ${checked} were`);
+  assert.equal(guesses.filter((result) => result.status === 429).length, 20 - checked);
+});
+
+test("a correct password does not use up the address's attempts", { skip }, async () => {
+  await register("often@example.com", "correct-horse");
+  for (let attempt = 0; attempt < 35; attempt += 1) {
+    assert.equal((await auth({ action: "login", email: "often@example.com", password: "correct-horse" }, { ip: "192.0.2.77" })).status, 200);
+  }
+});
+
+test("Google sign-in takes over an account whose address was never confirmed", { skip }, async () => {
+  // Someone registers with another person's address and a password of their own.
+  const squatter = await register("victim@example.com", "squatter-pass");
+  const realFetch = globalThis.fetch;
+  process.env.GOOGLE_CLIENT_ID = "client-id";
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ aud: "client-id", iss: "accounts.google.com", sub: "g-1", email: "victim@example.com", email_verified: "true", exp: String(Math.floor(Date.now() / 1000) + 600) }));
+  try {
+    const signedIn = await auth({ action: "google", credential: "token" });
+    assert.equal(signedIn.status, 200);
+    assert.equal(signedIn.body.hasPassword, false);
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.GOOGLE_CLIENT_ID;
+  }
+  assert.equal((await auth({ action: "me" }, { token: squatter.token })).status, 401, "the registrant's session ends");
+  assert.equal((await auth({ action: "login", email: "victim@example.com", password: "squatter-pass" })).status, 401, "and the password no longer works");
+});
+
+test("Google sign-in keeps the password of a confirmed account", { skip }, async () => {
+  const { token } = await register("owner-g@example.com", "own-password");
+  await auth({ action: "verify-email", code: lastCode("owner-g@example.com") }, { token });
+  const realFetch = globalThis.fetch;
+  process.env.GOOGLE_CLIENT_ID = "client-id";
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ aud: "client-id", iss: "accounts.google.com", sub: "g-2", email: "owner-g@example.com", email_verified: "true", exp: String(Math.floor(Date.now() / 1000) + 600) }));
+  try {
+    assert.equal((await auth({ action: "google", credential: "token" })).body.hasPassword, true);
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.GOOGLE_CLIENT_ID;
+  }
+  assert.equal((await auth({ action: "me" }, { token })).status, 200);
+});
+
+test("changes stamped far in the future cannot win forever", { skip }, async () => {
+  const { token } = await register("clock@example.com");
+  const future = Date.now() + 365 * 86_400_000;
+  const result = await call(api.sync, { lists: [list("C1", "Будущее", future, [item("a", "Хлеб", future)])], profile: null, since: 0 }, { token });
+  const saved = result.body.lists.find((entry) => entry.id === "C1");
+  const limit = Date.now() + 5 * 60_000;
+  assert.ok(saved.updatedAt <= limit && saved.items[0].updatedAt <= limit, "stamps are held to at most 5 minutes ahead");
+  // So an edit made a little later wins.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const fixed = await call(api.sync, { lists: [list("C1", "Сейчас", Date.now() + 5 * 60_000 + 5, [])], profile: null, since: 0 }, { token });
+  assert.equal(fixed.body.lists.find((entry) => entry.id === "C1").name, "Сейчас");
+});
+
+test("removed products never push out live ones, and old removals are forgotten", { skip }, async () => {
+  const { token } = await register("churn@example.com");
+  const now = Date.now();
+  const removed = Array.from({ length: 1500 }, (_, index) => item(`old-${index}`, `Удалён ${index}`, now - 1000, { deleted: true }));
+  const ancient = item("ancient", "Давно удалён", now - 90 * 86_400_000, { deleted: true });
+  const result = await call(api.sync, { lists: [list("T1", "Много", now, [...removed, ancient, item("live", "Хлеб", now)])], profile: null, since: 0 }, { token });
+  const saved = result.body.lists.find((entry) => entry.id === "T1");
+  assert.ok(saved.items.some((entry) => entry.id === "live" && !entry.deleted));
+  assert.ok(!saved.items.some((entry) => entry.id === "ancient"));
 });

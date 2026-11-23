@@ -20,3 +20,14 @@ export function mergeProfile<
   mine: Profile<Store, Template, Recipe, Category, Settings>,
   theirs: Profile<Store, Template, Recipe, Category, Settings>,
 ): Profile<Store, Template, Recipe, Category, Settings>;
+
+export const TOMBSTONE_LIFETIME: number;
+export function dropOldTombstones<T extends Entity>(entities: T[] | undefined, now?: number): T[];
+export function pruneList<T extends Entity & { items: Entity[] }>(list: T, now?: number): T;
+export function pruneProfile<
+  Store extends Entity,
+  Template extends Entity,
+  Recipe extends Entity,
+  Category extends Entity,
+  Settings extends { updatedAt: number },
+>(profile: Profile<Store, Template, Recipe, Category, Settings>, now?: number): Profile<Store, Template, Recipe, Category, Settings>;

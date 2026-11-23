@@ -12,7 +12,7 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Editing Boundary
 
-- Build app-specific UI in `src/Prototype.tsx` and `src/prototype.css`.
+- Build app-specific UI in `src/Prototype.tsx`, `src/app/` and `src/prototype.css`. `src/app/useShoppingApp.ts` holds the app's state and actions; `src/app/HomeScreen.tsx`, `ListScreen.tsx`, `SettingsTab.tsx` and `src/app/sheets/` render them. Import the runtime as `../mobile` (or `../../mobile`): the Android build swaps that import for `src/native/index.tsx`.
 - Treat `src/App.tsx`, `src/main.tsx`, `src/styles.css`, `src/mobile/`, `public/assets/iphone/`, `public/assets/android/`, `public/assets/status/`, `vite.config.ts`, `worker/index.js`, and `scripts/prepare-sites-build.mjs` as protected runtime files. Do not edit, replace, remove, or recreate them unless the user explicitly asks to change the mobile runtime itself. For an explicit runtime change, update the affected lock hashes only after verifying the new runtime behavior.
 - Run `npm run check:runtime` before preview or handoff. If it fails, restore the protected runtime instead of weakening or bypassing the check.
 - `npm run build` preserves the mobile runtime and prepares the static Cloudflare Worker output required by Sites. Before a Sites handoff, confirm `dist/client/index.html`, `dist/server/index.js`, `dist/.openai/hosting.json`, and source `.openai/hosting.json` exist, then run `npm run test:sites`. Do not replace this project with a Vinext starter.

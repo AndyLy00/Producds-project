@@ -45,7 +45,8 @@ export default defineConfig({
   define: { __APP_VERSION_CODE__: JSON.stringify(Number(process.env.APP_VERSION_CODE ?? 0)) },
   build: { outDir: "dist/android", emptyOutDir: true },
   resolve: {
-    alias: [{ find: /^\.\/mobile$/, replacement: fileURLToPath(new URL("./src/native/index.tsx", import.meta.url)) }],
+    // "./mobile" from src/, "../mobile" and "../../mobile" from src/app/.
+    alias: [{ find: /^(?:\.\/|(?:\.\.\/)+)mobile$/, replacement: fileURLToPath(new URL("./src/native/index.tsx", import.meta.url)) }],
   },
   plugins: [react(), androidApp()],
 });

@@ -5,7 +5,6 @@ import { randomUUID } from "node:crypto";
 import {
   HttpError,
   account,
-  assertNotBlocked,
   authenticate,
   clearAttempts,
   clientAddress,
@@ -21,11 +20,12 @@ import {
   preflight,
   randomToken,
   readJson,
-  recordAttempt,
+  returnAttempt,
   route,
   sendEmail,
   sendVerificationCode,
   sha256,
+  takeAttempt,
   useCode,
 } from "./_lib.js";
 
@@ -48,14 +48,12 @@ async function sendVerificationQuietly(user) {
 async function checkPasswordAttempt(request, email, user, password) {
   const byEmail = `login:email:${email}`;
   const byAddress = `login:ip:${clientAddress(request)}`;
-  // Checked before the password, so a blocked attacker learns nothing even from a correct guess.
-  await assertNotBlocked(byEmail, 5, 15 * MINUTE);
-  await assertNotBlocked(byAddress, 30, 15 * MINUTE);
-  if (!user?.passwordHash || !(await passwordMatches(password, user))) {
-    await Promise.all([recordAttempt(byEmail, 15 * MINUTE), recordAttempt(byAddress, 15 * MINUTE)]);
-    return false;
-  }
-  await clearAttempts(byEmail, 15 * MINUTE);
+  // Every attempt is counted before the password is checked, so a blocked attacker learns
+  // nothing even from a correct guess; a correct password then gives its attempt back.
+  await takeAttempt(byEmail, 5, 15 * MINUTE);
+  await takeAttempt(byAddress, 30, 15 * MINUTE);
+  if (!user?.passwordHash || !(await passwordMatches(password, user))) return false;
+  await Promise.all([clearAttempts(byEmail, 15 * MINUTE), returnAttempt(byAddress, 15 * MINUTE)]);
   return true;
 }
 
@@ -86,9 +84,7 @@ const actions = {
   async register(request, body) {
     const { email, password } = parseCredentials(body);
     // Keeps one address from mass-creating accounts or probing which emails are registered.
-    const byAddress = `register:ip:${clientAddress(request)}`;
-    await assertNotBlocked(byAddress, 10, HOUR);
-    await recordAttempt(byAddress, HOUR);
+    await takeAttempt(`register:ip:${clientAddress(request)}`, 10, HOUR);
     const { salt, hash } = await hashPassword(password);
     const user = { _id: randomUUID(), email, passwordSalt: salt, passwordHash: hash, emailVerified: false, tokenVersion: 0, createdAt: new Date() };
     try {
@@ -126,8 +122,7 @@ const actions = {
   async "resend-verification"(request) {
     const user = await authenticate(request);
     if (user.emailVerified) return json(200, { ok: true });
-    await assertNotBlocked(`verify:${user._id}`, 5, HOUR);
-    await recordAttempt(`verify:${user._id}`, HOUR);
+    await takeAttempt(`verify:${user._id}`, 5, HOUR);
     await sendVerificationCode(user);
     return json(200, { ok: true });
   },
@@ -135,9 +130,8 @@ const actions = {
   async forgot(request, body) {
     const email = parseEmail(body.email);
     if (!emailEnabled()) throw new HttpError(503, "Отправка писем пока не настроена.");
-    await assertNotBlocked(`forgot:email:${email}`, 5, HOUR);
-    await assertNotBlocked(`forgot:ip:${clientAddress(request)}`, 20, HOUR);
-    await Promise.all([recordAttempt(`forgot:email:${email}`, HOUR), recordAttempt(`forgot:ip:${clientAddress(request)}`, HOUR)]);
+    await takeAttempt(`forgot:email:${email}`, 5, HOUR);
+    await takeAttempt(`forgot:ip:${clientAddress(request)}`, 20, HOUR);
     const user = await (await users()).findOne({ email });
     // The same answer whether or not the account exists.
     if (user) {
@@ -195,7 +189,15 @@ const actions = {
     const { googleId, email } = await verifyGoogleCredential(body.credential);
     const collection = await users();
     let user = (await collection.findOne({ googleId })) ?? (await collection.findOne({ email }));
-    if (user) {
+    if (user && !user.emailVerified && user.googleId !== googleId) {
+      // The account was registered with this address but the address was never confirmed, so
+      // whoever registered it may not own the mailbox. Google has just proved who does: the
+      // password set by the registrant is dropped and every existing session ends.
+      const tokenVersion = (user.tokenVersion ?? 0) + 1;
+      await collection.updateOne({ _id: user._id }, { $set: { googleId, emailVerified: true, tokenVersion }, $unset: { passwordHash: "", passwordSalt: "" } });
+      const { passwordHash, passwordSalt, ...rest } = user;
+      user = { ...rest, googleId, emailVerified: true, tokenVersion };
+    } else if (user) {
       await collection.updateOne({ _id: user._id }, { $set: { googleId, emailVerified: true } });
       user = { ...user, googleId, emailVerified: true };
     } else {
