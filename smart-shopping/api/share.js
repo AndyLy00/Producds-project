@@ -17,11 +17,15 @@ import {
   sendEmail,
   takeAttempt,
 } from "./_lib.js";
+import { accessFilter, familyMembers, sharedWithFamily } from "./_family.js";
 
 const INVITE_DAYS = 7;
 
-async function memberList(db, listId, user) {
-  const list = typeof listId === "string" ? await db.collection("lists").findOne({ _id: listId, members: user._id }) : null;
+// The list, when the user may open it: as one of its members, or (unless `membersOnly`) through
+// the family (api/_family.js).
+async function memberList(db, listId, user, membersOnly = false) {
+  const filter = membersOnly ? { members: user._id } : accessFilter(user._id, await familyMembers(db, user._id));
+  const list = typeof listId === "string" ? await db.collection("lists").findOne({ _id: listId, ...filter }) : null;
   if (!list) throw new HttpError(404, "Список не найден. Возможно, его ещё не успели сохранить — попробуйте через пару секунд.");
   return list;
 }
@@ -53,7 +57,7 @@ const actions = {
 
   async join(request, body, user, db) {
     const invite = typeof body.token === "string" ? await db.collection("invites").findOne({ _id: body.token }) : null;
-    if (!invite || invite.expiresAt < new Date()) throw new HttpError(404, "Приглашение устарело. Попросите прислать новое.");
+    if (!invite || !invite.listId || invite.expiresAt < new Date()) throw new HttpError(404, "Приглашение устарело. Попросите прислать новое.");
     const list = await db.collection("lists").findOneAndUpdate(
       { _id: invite.listId },
       { $addToSet: { members: user._id }, $set: { serverUpdatedAt: Date.now() } },
@@ -64,7 +68,7 @@ const actions = {
   },
 
   async leave(request, body, user, db) {
-    const list = await memberList(db, body.listId, user);
+    const list = await memberList(db, body.listId, user, true);
     const members = list.members.filter((id) => id !== user._id);
     if (members.length === 0) {
       await db.collection("lists").deleteOne({ _id: list._id });
@@ -79,7 +83,9 @@ const actions = {
 
   async members(request, body, user, db) {
     const list = await memberList(db, body.listId, user);
-    const users = await db.collection("users").find({ _id: { $in: list.members } }, { projection: { email: 1 } }).toArray();
+    const family = await familyMembers(db, user._id);
+    const people = sharedWithFamily(list, family) ? [...new Set([...list.members, ...family])] : list.members;
+    const users = await db.collection("users").find({ _id: { $in: people } }, { projection: { email: 1 } }).toArray();
     return json(200, {
       members: users.map((member) => ({ email: member.email, owner: member._id === list.ownerId, you: member._id === user._id })),
     });

@@ -2,7 +2,7 @@
 // folder only render what this hook returns and call its actions.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useKeyboard } from "../mobile";
-import { useCloudSync, type Member } from "../cloud-sync";
+import { useCloudSync, type FamilyInvite, type Member } from "../cloud-sync";
 import { allowBrowserNotifications, allowReminders, exactAlarmsAllowed, isNativeApp, onNotificationOpened, openExactAlarmSettings, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
 import { forgetPhotosExcept, newPhotoId, savePhoto, shrinkPhoto } from "../photos";
 import {
@@ -35,7 +35,7 @@ import {
 } from "../model";
 import { loadShoppingData, saveShoppingData } from "../shopping-data";
 import { moveItem } from "../sortable";
-import { blankProduct, errorText, inviteFromAddress, type AccountStep, type RecipeForm, type Sheet, type Tab, type Toast } from "./types";
+import { blankProduct, errorText, inviteFromAddress, type AccountStep, type Invite, type RecipeForm, type Sheet, type Tab, type Toast } from "./types";
 import { useTimers } from "./useTimers";
 
 export type ShoppingApp = ReturnType<typeof useShoppingApp>;
@@ -63,7 +63,8 @@ export function useShoppingApp() {
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
   const [shareState, setShareState] = useState<{ link: string; email: string; members: Member[] }>({ link: "", email: "", members: [] });
-  const [pendingInvite, setPendingInvite] = useState<string | null>(inviteFromAddress);
+  const [pendingInvite, setPendingInvite] = useState<Invite | null>(inviteFromAddress);
+  const [familyState, setFamilyState] = useState<{ link: string; email: string; preview: FamilyInvite | null }>({ link: "", email: "", preview: null });
   const googleButton = useRef<HTMLDivElement | null>(null);
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -160,7 +161,9 @@ export function useShoppingApp() {
           continue;
         }
         const invite = url.searchParams.get("invite");
-        if (invite) setPendingInvite(invite);
+        const familyInvite = url.searchParams.get("family");
+        if (invite) setPendingInvite({ kind: "list", token: invite });
+        else if (familyInvite) setPendingInvite({ kind: "family", token: familyInvite });
         const code = url.protocol === "korzina:" && url.host === "auth" ? url.searchParams.get("code") : null;
         if (code) {
           cloudRef.current.account.finishAppGoogleLogin(code).then(() => { setSheet(null); notify("Вы вошли через Google"); }, (error) => notify(errorText(error)));
@@ -176,11 +179,18 @@ export function useShoppingApp() {
     if (!pendingInvite || !ready) return;
     if (!cloud.email) {
       openAccount("login");
-      setFormError("Войдите или создайте аккаунт, чтобы присоединиться к списку.");
+      setFormError(pendingInvite.kind === "family" ? "Войдите или создайте аккаунт, чтобы присоединиться к семье." : "Войдите или создайте аккаунт, чтобы присоединиться к списку.");
       return;
     }
-    const token = pendingInvite;
+    const { kind, token } = pendingInvite;
     setPendingInvite(null);
+    if (kind === "family") {
+      // Joining shares all of the user's lists, so it is confirmed first.
+      setFamilyState((previous) => ({ ...previous, preview: null }));
+      openSheet({ kind: "family-join", token });
+      cloud.familyActions.preview(token).then((preview) => setFamilyState((previous) => ({ ...previous, preview })), (error) => setFormError(errorText(error)));
+      return;
+    }
     cloud.share.join(token).then(
       ({ listId, name }) => { setSheet(null); setTab("lists"); setCurrentListId(listId); notify(`Вы присоединились к списку «${name}»`); },
       (error) => notify(errorText(error)),
@@ -294,7 +304,8 @@ export function useShoppingApp() {
     setSheet(null);
     setCurrentListId(null);
     const sharing = data.sharing[list.id];
-    if (sharing && !sharing.owner) {
+    // Someone else's list shared with the user alone is left; a family list is removed for all.
+    if (sharing && !sharing.owner && !sharing.family) {
       cloud.share.leave(list.id).then(() => notify("Вы вышли из совместного списка"), (error) => notify(errorText(error)));
       return;
     }
@@ -655,6 +666,28 @@ export function useShoppingApp() {
     notify("Вы вышли из аккаунта");
   }
 
+  // --- Family ------------------------------------------------------------------------------------
+
+  function openFamily() {
+    setFamilyState({ link: "", email: "", preview: null });
+    openSheet({ kind: "family" });
+  }
+
+  function joinFamily(token: string) {
+    void run(() => cloud.familyActions.join(token), () => { closeSheet(); setTab("lists"); notify("Вы в семье — списки теперь общие"); });
+  }
+
+  function leaveFamily() {
+    void run(() => cloud.familyActions.leave(), () => { closeSheet(); notify("Вы вышли из семьи"); });
+  }
+
+  // A personal list is seen only by its own members; any other list by the whole family.
+  function togglePersonal(list: ShoppingList) {
+    const personal = !list.personal;
+    patchList(list.id, { personal });
+    notify(personal ? "Список стал личным — семья его не видит" : "Список снова виден всей семье");
+  }
+
   function openShare(list: ShoppingList) {
     setShareState({ link: "", email: "", members: [] });
     openSheet({ kind: "share", listId: list.id });
@@ -683,7 +716,7 @@ export function useShoppingApp() {
     data, tab, setTab, query, setQuery, sheet, form, setForm, listName, setListName, quickName, setQuickName,
     showPurchased, setShowPurchased, toast, setToast, recipeForm, setRecipeForm, storeForm, setStoreForm,
     categoryName, setCategoryName, reminderValue, setReminderValue, credentials, setCredential, formError, busy,
-    shareState, setShareState, googleButton, keyboard, cloud,
+    shareState, setShareState, familyState, setFamilyState, googleButton, keyboard, cloud,
     // Derived
     activeLists, history, categories, currentList, favorites, storeName, sheetList, hints, cooking, cookingRecipe, timers, exactAlarms,
     // Actions
@@ -693,6 +726,7 @@ export function useShoppingApp() {
     openRecipe, saveRecipe, editStep, addStep, removeStep, moveStep, pickRecipePhoto, removeRecipePhoto,
     startCooking, goToStep, stopCooking, startStepTimer, allowExactAlarms,
     openStore, saveStore, openCategories, addCategory, setReminder,
+    openFamily, joinFamily, leaveFamily, togglePersonal,
     openAccount, run, submitAccount, openPasswordSheet, openDeleteAccount, startVerification, signOut, openShare,
   };
 }

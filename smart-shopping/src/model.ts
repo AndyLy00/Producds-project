@@ -29,6 +29,8 @@ export type ShoppingList = {
   storeId?: string;
   sortMode: "category" | "manual";
   remindAt?: number;
+  // Hidden from the family (api/_family.js): only the list's own members see it.
+  personal?: boolean;
   deleted?: boolean;
   items: ShoppingItem[];
 };
@@ -43,7 +45,8 @@ export type Recipe = { id: string; name: string; note: string; ingredients: Prod
 export type Category = { id: string; name: string; updatedAt: number; deleted?: boolean };
 export type Settings = { darkMode: boolean; updatedAt: number };
 // Received from the server for lists that more than one account has; never edited locally.
-export type Sharing = Record<string, { members: number; owner: boolean }>;
+// `family`: the list is open to the whole family, not only to its own members.
+export type Sharing = Record<string, { members: number; owner: boolean; family?: boolean }>;
 
 export type ShoppingData = {
   lists: ShoppingList[];

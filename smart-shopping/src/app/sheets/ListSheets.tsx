@@ -8,7 +8,9 @@ import {
   Cross2Icon,
   EnvelopeClosedIcon,
   ExitIcon,
+  HomeIcon,
   Link2Icon,
+  LockClosedIcon,
   MixIcon,
   Pencil1Icon,
   PersonIcon,
@@ -71,6 +73,7 @@ export function ListActionsSheet({ app }: Props<"actions">) {
   const list = app.sheetList;
   if (!list) return null;
   const sharing = app.data.sharing[list.id];
+  const inFamily = (app.cloud.family?.members.length ?? 0) > 1;
   const action = (icon: ReactNode, label: string, onClick: () => void, detail?: string, danger = false) => (
     <button type="button" className={`setting-row action-row ${danger ? "action-danger" : ""}`} onClick={onClick}><span className="setting-icon">{icon}</span><span><b>{label}</b>{detail && <small>{detail}</small>}</span><ChevronRightIcon /></button>
   );
@@ -79,12 +82,19 @@ export function ListActionsSheet({ app }: Props<"actions">) {
       <SheetClose app={app} />
       {action(<Pencil1Icon />, "Переименовать", () => { app.setListName(list.name); app.openSheet({ kind: "list", listId: list.id }); })}
       {action(<PersonIcon />, "Вести вместе", () => app.openShare(list), sharing ? `Участников: ${sharing.members}` : "Пригласить по ссылке или почте")}
+      {inFamily && (sharing?.owner || !sharing || list.personal) && (
+        <button type="button" className="setting-row action-row" onClick={() => app.togglePersonal(list)}>
+          <span className="setting-icon">{list.personal ? <LockClosedIcon /> : <HomeIcon />}</span>
+          <span><b>Семейный список</b><small>{list.personal ? "Личный — видите только вы" : "Виден всей семье"}</small></span>
+          <span className={`theme-switch ${list.personal ? "" : "switch-on"}`}><i /></span>
+        </button>
+      )}
       {action(<Share1Icon />, "Отправить текстом", () => void app.sendAsText(list), "В мессенджер или заметки")}
       {action(<BellIcon />, "Напоминание", () => { app.setReminderValue(toLocalInput(list.remindAt ?? at(1, 10))); app.openSheet({ kind: "reminder", listId: list.id }); }, list.remindAt ? formatReminder(list.remindAt) : "Не задано")}
       {action(<MixIcon />, "Магазин", () => app.openSheet({ kind: "store-pick", listId: list.id }), app.storeName(list) ?? "Не выбран")}
       {action(<BookmarkIcon />, "Сохранить как шаблон", () => app.saveAsTemplate(list))}
       {action(<ArchiveIcon />, "Завершить", () => app.completeList(list), "Перенести в историю")}
-      {action(sharing && !sharing.owner ? <ExitIcon /> : <TrashIcon />, sharing && !sharing.owner ? "Покинуть список" : sharing ? "Удалить у всех участников" : "Удалить список", () => app.deleteList(list), undefined, true)}
+      {action(sharing && !sharing.owner && !sharing.family ? <ExitIcon /> : <TrashIcon />, sharing && !sharing.owner && !sharing.family ? "Покинуть список" : sharing?.family ? "Удалить у всей семьи" : sharing ? "Удалить у всех участников" : "Удалить список", () => app.deleteList(list), undefined, true)}
     </div>
   );
 }

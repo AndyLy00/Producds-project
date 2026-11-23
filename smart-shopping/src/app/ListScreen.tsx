@@ -41,7 +41,7 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
           <div className="list-heading-row">
             <button className="back-button" aria-label="К спискам" onClick={app.closeList}><ArrowLeftIcon /></button>
             <div className="list-heading-copy">
-              <p className="eyebrow">{data.sharing[list.id] ? "СОВМЕСТНЫЙ СПИСОК" : "СПИСОК ПОКУПОК"}</p>
+              <p className="eyebrow">{data.sharing[list.id]?.family ? "СЕМЕЙНЫЙ СПИСОК" : data.sharing[list.id] ? "СОВМЕСТНЫЙ СПИСОК" : "СПИСОК ПОКУПОК"}</p>
               <h1>{list.name}</h1>
             </div>
             <button className="icon-button" aria-label="Отправить список" onClick={() => void app.sendAsText(list)}><Share1Icon /></button>

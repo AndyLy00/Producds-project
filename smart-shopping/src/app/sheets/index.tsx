@@ -2,6 +2,7 @@
 import { BottomSheet } from "../../mobile";
 import type { ShoppingApp } from "../useShoppingApp";
 import { AccountSheet, DeleteAccountSheet, PasswordSheet } from "./AccountSheets";
+import { FamilyJoinSheet, FamilySheet } from "./FamilySheets";
 import { ListActionsSheet, ListNameSheet, PickListSheet, ProductSheet, ReminderSheet, ShareSheet, StorePickSheet } from "./ListSheets";
 import { CategoriesSheet, RecipeSheet, StoreSheet } from "./ProfileSheets";
 
@@ -30,6 +31,8 @@ function sheetMeta(app: ShoppingApp): { title: string; description?: string } {
     };
     case "password": return { title: app.cloud.hasPassword ? "Сменить пароль" : "Задать пароль", description: "На других устройствах нужно будет войти заново." };
     case "delete-account": return { title: "Удалить аккаунт", description: "Аккаунт и его данные на сервере удалятся. Списки на этом устройстве останутся." };
+    case "family": return { title: "Семья", description: "В семье все списки общие: каждый видит и меняет их вместе с остальными." };
+    case "family-join": return { title: "Приглашение в семью" };
     default: return { title: "" };
   }
 }
@@ -50,6 +53,8 @@ function SheetContent({ app }: { app: ShoppingApp }) {
     case "account": return <AccountSheet app={app} sheet={sheet} />;
     case "password": return <PasswordSheet app={app} sheet={sheet} />;
     case "delete-account": return <DeleteAccountSheet app={app} sheet={sheet} />;
+    case "family": return <FamilySheet app={app} sheet={sheet} />;
+    case "family-join": return <FamilyJoinSheet app={app} sheet={sheet} />;
     default: return null;
   }
 }

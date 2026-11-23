@@ -15,10 +15,12 @@ const POLL_INTERVAL = 5000;
 
 type Session = { email: string; token: string; verified: boolean; hasPassword: boolean; since: number };
 type AccountResponse = Omit<Session, "since">;
-type SyncResponse = { lists: ShoppingList[]; profile: Profile; sharing: Sharing; revoked: string[]; now: number };
+type SyncResponse = { lists: ShoppingList[]; profile: Profile; sharing: Sharing; revoked: string[]; familySize?: number; now: number };
 export type SyncStatus = "idle" | "syncing" | "synced" | "error";
 export type AuthConfig = { googleClientId: string | null; email: boolean };
 export type Member = { email: string; owner: boolean; you: boolean };
+export type Family = { members: Member[]; owner: boolean };
+export type FamilyInvite = { from: string | null; members: number; already: boolean };
 
 export { API_ORIGIN };
 
@@ -83,6 +85,7 @@ export function useCloudSync(
   const dataRef = useRef(data);
   dataRef.current = data;
   const dirtyRef = useRef(false);
+  const [familySize, setFamilySize] = useState(1);
   // Sync steps run one after another so that two exchanges never race each other.
   const queueRef = useRef<Promise<void>>(Promise.resolve());
 
@@ -107,7 +110,14 @@ export function useCloudSync(
     try {
       const result = await api<SyncResponse>(
         "/api/sync",
-        { lists: full ? sent.lists.filter((list) => !isDemoList(list)) : [], profile: full ? profileOf(sent) : null, since: current.since },
+        {
+          lists: full ? sent.lists.filter((list) => !isDemoList(list)) : [],
+          // Every list on the device, so the server can say which ones the account lost (it
+          // left a shared list or the family) even when nothing is sent.
+          known: full ? [] : sent.lists.filter((list) => !isDemoList(list)).map((list) => list.id),
+          profile: full ? profileOf(sent) : null,
+          since: current.since,
+        },
         current.token,
       );
       // On the first exchange with an account that has lists, the untouched demo lists give way.
@@ -115,6 +125,7 @@ export function useCloudSync(
       setData((previous) => mergeData(dropDemo ? { ...previous, lists: previous.lists.filter((list) => !isDemoList(list)) } : previous, result));
       const latest = sessionRef.current;
       if (latest?.token === current.token) updateSession({ ...latest, since: result.now });
+      setFamilySize(result.familySize ?? 1);
     } catch (error) {
       if (full) dirtyRef.current = true;
       throw error;
@@ -239,6 +250,45 @@ export function useCloudSync(
     signOut,
   };
 
+  // The family's lists are all shared (api/_family.js). Joining or leaving changes which lists
+  // the account sees, so the next exchange starts over and sends everything.
+  const [family, setFamily] = useState<Family | null>(null);
+  const familyCall = useCallback(<T,>(body: Record<string, unknown>) => enqueue((current) => api<T>("/api/family", body, current.token), true), [enqueue]);
+  const refreshFamily = useCallback(() => familyCall<{ family: Family | null }>({ action: "get" }).then((result) => setFamily(result.family), () => undefined), [familyCall]);
+  useEffect(() => {
+    if (token) void refreshFamily();
+    else setFamily(null);
+  }, [token, refreshFamily]);
+  // Someone joined or left the family on another device: the sync reports the new size.
+  useEffect(() => {
+    if (token && familySize !== (family?.members.length ?? 1)) void refreshFamily();
+  }, [familySize]);
+  const resync = useCallback(async () => {
+    const latest = sessionRef.current;
+    if (latest) updateSession({ ...latest, since: 0 });
+    dirtyRef.current = true;
+    await sync();
+    await refreshFamily();
+  }, [sync, refreshFamily, updateSession]);
+
+  const familyActions = {
+    invite: (email?: string) => familyCall<{ link: string }>({ action: "invite", email }).then(async (result) => { await refreshFamily(); return result.link; }),
+    preview: (token: string) => familyCall<FamilyInvite>({ action: "preview", token }),
+    join: async (token: string) => {
+      await familyCall({ action: "join", token });
+      await resync();
+    },
+    leave: async () => {
+      await familyCall({ action: "leave" });
+      await resync();
+    },
+    remove: async (email: string) => {
+      await familyCall({ action: "remove", email });
+      await refreshFamily();
+      await sync(true);
+    },
+  };
+
   const share = {
     // The list must exist on the server before it can be shared.
     invite: async (listId: string, email?: string) => {
@@ -268,6 +318,8 @@ export function useCloudSync(
     sync,
     account,
     share,
+    family,
+    familyActions,
   };
 }
 

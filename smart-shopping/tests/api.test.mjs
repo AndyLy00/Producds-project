@@ -15,8 +15,8 @@ let db;
 
 before(async () => {
   if (skip) return;
-  const [auth, sync, share, photo, lib] = await Promise.all([import("../api/auth.js"), import("../api/sync.js"), import("../api/share.js"), import("../api/photo.js"), import("../api/_lib.js")]);
-  api = { auth: auth.POST, config: auth.GET, sync: sync.POST, share: share.POST, photoUpload: photo.POST, photoGet: photo.GET };
+  const [auth, sync, share, photo, familyApi, lib] = await Promise.all([import("../api/auth.js"), import("../api/sync.js"), import("../api/share.js"), import("../api/photo.js"), import("../api/family.js"), import("../api/_lib.js")]);
+  api = { auth: auth.POST, config: auth.GET, sync: sync.POST, share: share.POST, photoUpload: photo.POST, photoGet: photo.GET, family: familyApi.POST };
   db = await lib.database();
 });
 
@@ -182,7 +182,7 @@ test("a list is shared through an invitation link, and leaving it stops access",
 
   const guestView = await call(api.sync, { lists: [], since: 0 }, { token: guest });
   assert.deepEqual(guestView.body.lists.map((entry) => entry.name), ["Семья"]);
-  assert.deepEqual(guestView.body.sharing, { S1: { members: 2, owner: false } });
+  assert.deepEqual(guestView.body.sharing, { S1: { members: 2, owner: false, family: false } });
 
   // The guest adds a product; the owner sees it.
   await call(api.sync, { lists: [{ ...guestView.body.lists[0], items: [...guestView.body.lists[0].items, item("y", "Хлеб", 9)] }], since: 0 }, { token: guest });
@@ -346,4 +346,88 @@ test("photos no recipe uses are removed after a day, and with the account", { sk
 
   await auth({ action: "delete-account", password: "tidy-password" }, { token });
   assert.equal(await db.collection("photos").countDocuments({ _id: { $in: [used, fresh] } }), 0);
+});
+
+const family = (body, token) => call(api.family, body, { token });
+const tokenOf = (link) => new URL(link).searchParams.get("family");
+
+test("a family sees all of each other's lists except personal ones", { skip }, async () => {
+  const anna = (await register("anna-f@example.com")).token;
+  const boris = (await register("boris-f@example.com")).token;
+  const now = Date.now();
+  await call(api.sync, { lists: [list("F1", "Продукты", now), { ...list("F2", "Подарок", now), personal: true }], profile: profile(), since: 0 }, { token: anna });
+
+  assert.deepEqual((await family({ action: "get" }, anna)).body, { family: null });
+  const { link } = (await family({ action: "invite" }, anna)).body;
+  assert.match(link, /\/join\?family=/);
+  assert.deepEqual((await family({ action: "preview", token: tokenOf(link) }, boris)).body, { from: "anna-f@example.com", members: 1, already: false });
+  assert.equal((await family({ action: "join", token: tokenOf(link) }, boris)).status, 200);
+
+  const members = (await family({ action: "get" }, boris)).body.family.members;
+  assert.deepEqual(members.map((member) => [member.email, member.owner, member.you]), [["anna-f@example.com", true, false], ["boris-f@example.com", false, true]]);
+
+  // Boris sees Anna's lists at once, but not the personal one.
+  const borisView = await call(api.sync, { lists: [], since: 0 }, { token: boris });
+  assert.deepEqual(borisView.body.lists.map((entry) => entry.name), ["Продукты"]);
+  assert.deepEqual(borisView.body.sharing.F1, { members: 2, owner: false, family: true });
+
+  // Boris adds a product to it and creates a list; Anna, who last looked before, gets both.
+  const annaSince = (await call(api.sync, { lists: [], since: 0 }, { token: anna })).body.now;
+  await call(api.sync, { lists: [{ ...borisView.body.lists[0], items: [item("b1", "Хлеб", now + 1)] }, list("F3", "Дача", now)], since: 0 }, { token: boris });
+  const annaView = await call(api.sync, { lists: [], since: annaSince }, { token: anna });
+  // (Her own lists come too: the server answers with a margin of a few seconds.)
+  assert.ok(["Дача", "Продукты"].every((name) => annaView.body.lists.some((entry) => entry.name === name)));
+  assert.equal(annaView.body.lists.find((entry) => entry.id === "F1").items[0].name, "Хлеб");
+
+  // Boris can invite an outsider to a family list and sees everyone who has it.
+  assert.equal((await call(api.share, { action: "invite", listId: "F1" }, { token: boris })).status, 200);
+  const who = await call(api.share, { action: "members", listId: "F1" }, { token: boris });
+  assert.deepEqual(who.body.members.map((member) => member.email).sort(), ["anna-f@example.com", "boris-f@example.com"]);
+});
+
+test("leaving a family takes the access away on both sides", { skip }, async () => {
+  const vera = (await register("vera-f@example.com")).token;
+  const gleb = (await register("gleb-f@example.com")).token;
+  const now = Date.now();
+  await call(api.sync, { lists: [list("G1", "Верин", now)], profile: profile(), since: 0 }, { token: vera });
+  await call(api.sync, { lists: [list("G2", "Глебов", now)], profile: profile(), since: 0 }, { token: gleb });
+  await family({ action: "join", token: tokenOf((await family({ action: "invite" }, vera)).body.link) }, gleb);
+  assert.deepEqual((await call(api.sync, { lists: [], since: 0 }, { token: gleb })).body.lists.map((entry) => entry.id).sort(), ["G1", "G2"]);
+
+  await family({ action: "leave" }, gleb);
+  // Only checking for news, each device still learns which of its lists it lost.
+  const glebView = await call(api.sync, { lists: [], known: ["G1", "G2"], since: 0 }, { token: gleb });
+  assert.deepEqual(glebView.body.revoked, ["G1"]);
+  assert.deepEqual(glebView.body.lists.map((entry) => entry.id), ["G2"]);
+  assert.deepEqual((await call(api.sync, { lists: [], known: ["G1", "G2"], since: 0 }, { token: vera })).body.revoked, ["G2"]);
+  assert.equal((await family({ action: "get" }, vera)).body.family.members.length, 1);
+});
+
+test("an account is in one family at a time, and the creator can take people out", { skip }, async () => {
+  const one = (await register("one-f@example.com")).token;
+  const two = (await register("two-f@example.com")).token;
+  const other = (await register("other-f@example.com")).token;
+  await family({ action: "join", token: tokenOf((await family({ action: "invite" }, one)).body.link) }, two);
+  const elsewhere = (await family({ action: "invite" }, other)).body.link;
+  assert.equal((await family({ action: "join", token: tokenOf(elsewhere) }, two)).status, 409);
+  assert.equal((await call(api.share, { action: "join", token: tokenOf(elsewhere) }, { token: two })).status, 404, "a family link is not a list link");
+
+  assert.equal((await family({ action: "remove", email: "one-f@example.com" }, two)).status, 403, "only the creator removes people");
+  assert.equal((await family({ action: "remove", email: "two-f@example.com" }, one)).status, 200);
+  assert.equal((await family({ action: "get" }, two)).body.family, null);
+  // Now free to join the other family.
+  assert.equal((await family({ action: "join", token: tokenOf(elsewhere) }, two)).status, 200);
+});
+
+test("a list made personal leaves the family's devices", { skip }, async () => {
+  const dad = (await register("dad-f@example.com")).token;
+  const kid = (await register("kid-f@example.com")).token;
+  const now = Date.now();
+  await call(api.sync, { lists: [list("P1", "Сюрприз", now)], profile: profile(), since: 0 }, { token: dad });
+  await family({ action: "join", token: tokenOf((await family({ action: "invite" }, dad)).body.link) }, kid);
+  assert.deepEqual((await call(api.sync, { lists: [], since: 0 }, { token: kid })).body.lists.map((entry) => entry.id), ["P1"]);
+  await call(api.sync, { lists: [{ ...list("P1", "Сюрприз", now + 5), personal: true }], since: 0 }, { token: dad });
+  const kidView = await call(api.sync, { lists: [], known: ["P1"], since: 0 }, { token: kid });
+  assert.deepEqual(kidView.body.revoked, ["P1"]);
+  assert.deepEqual(kidView.body.lists, []);
 });

@@ -16,7 +16,9 @@ export type Sheet =
   | { kind: "categories" }
   | { kind: "account"; step: AccountStep }
   | { kind: "password" }
-  | { kind: "delete-account" };
+  | { kind: "delete-account" }
+  | { kind: "family" }
+  | { kind: "family-join"; token: string };
 export type SheetOf<K extends Sheet["kind"]> = Extract<Sheet, { kind: K }>;
 export type Toast = { text: string; undo?: ShoppingData };
 // A step being edited: `minutes` as typed; `auto` while they still follow the step's text.
@@ -41,10 +43,16 @@ export function nextWeekday(weekday: number, hours: number) {
   return at(((weekday - new Date().getDay() + 7) % 7) || 7, hours);
 }
 
-// Invitation opened as https://…/join?invite=… (on the site, or in the app through an app link).
-export function inviteFromAddress() {
+// Invitation opened as https://…/join?invite=… or …/join?family=… (on the site, or in the app
+// through an app link).
+export function inviteFromAddress(): Invite | null {
   if (typeof window === "undefined") return null;
-  const token = new URLSearchParams(window.location.search).get("invite");
-  if (token) window.history.replaceState(null, "", "/");
-  return token;
+  const params = new URLSearchParams(window.location.search);
+  const list = params.get("invite");
+  const family = params.get("family");
+  if (list || family) window.history.replaceState(null, "", "/");
+  return list ? { kind: "list", token: list } : family ? { kind: "family", token: family } : null;
 }
+
+// An invitation into a shared list, or into a family (?family=…).
+export type Invite = { kind: "list" | "family"; token: string };

@@ -1,5 +1,5 @@
 // Settings: theme, account, stores and own categories.
-import { BookmarkIcon, ChevronRightIcon, EnvelopeClosedIcon, ExitIcon, LockClosedIcon, MixIcon, MoonIcon, PersonIcon, PlusIcon, SunIcon, TrashIcon } from "@radix-ui/react-icons";
+import { BookmarkIcon, ChevronRightIcon, HomeIcon, EnvelopeClosedIcon, ExitIcon, LockClosedIcon, MixIcon, MoonIcon, PersonIcon, PlusIcon, SunIcon, TrashIcon } from "@radix-ui/react-icons";
 import { alive } from "../model";
 import type { ShoppingApp } from "./useShoppingApp";
 
@@ -21,6 +21,10 @@ export function SettingsTab({ app }: { app: ShoppingApp }) {
           <button className="destructive-button" onClick={app.openDeleteAccount}><TrashIcon /> Удалить аккаунт</button>
         </div>
       </div> : <button className="setting-row" onClick={() => app.openAccount("login")}><span className="setting-icon"><PersonIcon /></span><span><b>Войти или создать аккаунт</b><small>Чтобы списки были на всех устройствах и их можно было вести вместе</small></span><ChevronRightIcon /></button>}
+    </section>
+
+    <section className="settings-group"><p className="settings-label">СЕМЬЯ</p>
+      <button className="setting-row" onClick={app.openFamily}><span className="setting-icon"><HomeIcon /></span><span><b>{cloud.family && cloud.family.members.length > 1 ? `Семья · ${cloud.family.members.length} чел.` : "Семья"}</b><small>{cloud.family && cloud.family.members.length > 1 ? cloud.family.members.filter((member) => !member.you).map((member) => member.email).join(", ") : "Пригласите близких — все списки станут общими"}</small></span><ChevronRightIcon /></button>
     </section>
 
     <section className="settings-group"><p className="settings-label">МАГАЗИНЫ</p>

@@ -28,6 +28,7 @@ import {
   takeAttempt,
   useCode,
 } from "./_lib.js";
+import { leaveFamily } from "./_family.js";
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -172,6 +173,7 @@ const actions = {
       throw new HttpError(400, "Пароль указан неверно.");
     }
     const db = await database();
+    await leaveFamily(db, user._id);
     await db.collection("lists").updateMany({ members: user._id }, { $pull: { members: user._id }, $set: { serverUpdatedAt: Date.now() } });
     await Promise.all([
       db.collection("lists").deleteMany({ members: { $size: 0 } }),

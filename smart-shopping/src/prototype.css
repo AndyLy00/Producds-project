@@ -485,3 +485,9 @@
 .cooking-nav .primary-button, .cooking-nav .secondary-button { min-height: 50px; }
 @keyframes timer-pulse { from { opacity: 1; } to { opacity: 0.72; } }
 @media (prefers-reduced-motion: reduce) { .cooking-timer-done { animation: none; } }
+
+/* Family */
+.member-row .member-remove { display: grid; width: 26px; height: 26px; margin-left: auto; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted); }
+.member-row .member-remove svg { width: 13px; height: 13px; }
+.family-invite { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 15px; background: var(--white); }
+.family-invite p { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.45; }

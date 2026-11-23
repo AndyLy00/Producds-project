@@ -64,6 +64,8 @@ export function cleanList(value) {
     ...(value.completedAt ? { completedAt: time(value.completedAt) } : {}),
     ...(validId(value.storeId) ? { storeId: value.storeId } : {}),
     sortMode: value.sortMode === "manual" ? "manual" : "category",
+    // Hidden from the family (api/_family.js); only the list's own members see it.
+    ...(value.personal === true ? { personal: true } : {}),
     ...(value.remindAt ? { remindAt: time(value.remindAt) } : {}),
     ...tombstone(value),
     items: entities(value.items, 1000, cleanItem),
