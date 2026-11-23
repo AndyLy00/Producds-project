@@ -1,0 +1,48 @@
+# Collects Linella's prices into the app's database twice a month (scripts/linella/crawl.mjs),
+# with Linella's permission. Also runs by hand from the Actions tab; "dry run" reads two
+# categories and saves nothing.
+#
+# Secrets: MONGODB_URI (the same database as the Vercel functions), and LINELLA_BOT_KEY when
+# Linella lets the bot through Cloudflare by that key (README, "Цены Linella").
+name: Linella prices
+
+on:
+  schedule:
+    # 03:00 UTC on the 1st and the 15th: about every two weeks.
+    - cron: "0 3 1,15 * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: two categories, nothing saved"
+        type: boolean
+        default: false
+
+concurrency:
+  group: linella-prices
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: smart-shopping
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: smart-shopping/package-lock.json
+
+      - run: npm ci
+
+      - name: Collect prices
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          LINELLA_BOT_KEY: ${{ secrets.LINELLA_BOT_KEY }}
+          PRICE_BOT_DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          PRICE_BOT_LIMIT: ${{ inputs.dry_run && '2' || '' }}
+        run: node scripts/linella/crawl.mjs

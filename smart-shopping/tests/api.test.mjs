@@ -15,8 +15,8 @@ let db;
 
 before(async () => {
   if (skip) return;
-  const [auth, sync, share, photo, familyApi, lib] = await Promise.all([import("../api/auth.js"), import("../api/sync.js"), import("../api/share.js"), import("../api/photo.js"), import("../api/family.js"), import("../api/_lib.js")]);
-  api = { auth: auth.POST, config: auth.GET, sync: sync.POST, share: share.POST, photoUpload: photo.POST, photoGet: photo.GET, family: familyApi.POST };
+  const [auth, sync, share, photo, familyApi, pricesApi, lib] = await Promise.all([import("../api/auth.js"), import("../api/sync.js"), import("../api/share.js"), import("../api/photo.js"), import("../api/family.js"), import("../api/prices.js"), import("../api/_lib.js")]);
+  api = { auth: auth.POST, config: auth.GET, sync: sync.POST, share: share.POST, photoUpload: photo.POST, photoGet: photo.GET, family: familyApi.POST, prices: pricesApi.POST };
   db = await lib.database();
 });
 
@@ -445,4 +445,31 @@ test("the server answers in the app's language", { skip }, async () => {
   const blocked = await api.auth(new Request("https://korzina.example/api", { method: "POST", headers: { "x-real-ip": "203.0.113.9", "x-lang": "en" }, body: JSON.stringify({ action: "login", email: "lang@example.com", password: "right-password" }) }));
   assert.equal(blocked.status, 429);
   assert.match((await blocked.json()).error, /^Too many attempts\. Try again in \d+ min\.$/);
+});
+
+test("list items get Linella's prices: the median of the best-fitting products", { skip }, async () => {
+  assert.deepEqual((await call(api.prices, { names: ["Молоко"] })).body, { store: "linella", updatedAt: null, prices: {} }, "nothing before the first crawl");
+  const product = (id, ru, ro, price, extra = {}) => ({ _id: `linella:${id}`, store: "linella", name: { ru, ro }, url: { ru: `https://linella.md/ru/${id}/`, ro: `https://linella.md/${id}/` }, search: `${ru} ${ro}`.toLowerCase(), price, inStock: true, available: true, ...extra });
+  await db.collection("prices").insertMany([
+    product("m1", "Молоко 2.5% 1л JLC", "Lapte 2.5% 1l JLC", 1799),
+    product("m2", "Молоко 3.5% 930мл CASUTA MEA", "Lapte 3.5% 930ml CASUTA MEA", 2399),
+    product("m3", "Молоко UHT 3.2% 1л MLEKOVITA", "Lapte UHT 3.2% 1l MLEKOVITA", 3399),
+    product("m4", "Шоколад молочный 90г MILKA", "Ciocolată cu lapte 90g MILKA", 2999),
+    product("m5", "Молоко миндальное 1л", "Lapte de migdale 1l", 4799, { inStock: false }),
+    product("c1", "Сыр Салями 45%, кг LATTI", "Cașcaval Salami 45%, kg LATTI", 8000, { perKg: 15999, step: "за 500 г" }),
+    product("old", "Молоко старое", "Lapte vechi", 100, { available: false }),
+  ]);
+  await db.collection("priceRuns").insertOne({ store: "linella", ok: true, startedAt: new Date(), finishedAt: new Date(), products: 6, pages: 1 });
+
+  const { body } = await call(api.prices, { names: ["Молоко", "lapte", "Сыр салями", "Молоко деревенское", "Ананасы в коньяке", 42] });
+  // Milk in stock: 17.99, 23.99, 33.99 -> 23.99 (the chocolate starts with another word, the almond milk is out of stock).
+  assert.equal(body.prices["Молоко"].price, 2399);
+  assert.equal(body.prices["Молоко"].name, "Молоко 3.5% 930мл CASUTA MEA");
+  assert.equal(body.prices["lapte"].price, 2399, "Romanian names find the same products");
+  assert.equal(body.prices["lapte"].url, "https://linella.md/m2/");
+  assert.deepEqual({ ...body.prices["Сыр салями"], url: undefined }, { price: 8000, perKg: 15999, step: "за 500 г", name: "Сыр Салями 45%, кг LATTI", url: undefined, matches: 1 });
+  assert.equal(body.prices["Молоко деревенское"].price, 2399, "an unknown second word falls back to the first");
+  assert.equal(body.prices["Ананасы в коньяке"], null);
+  assert.equal(Object.keys(body.prices).length, 5, "only text names are looked up");
+  assert.equal((await call(api.prices, { names: "Молоко" })).status, 400);
 });

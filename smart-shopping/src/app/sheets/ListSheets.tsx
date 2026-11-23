@@ -24,10 +24,12 @@ import { shareText } from "../../device";
 import { addProducts, alive, formatReminder, guessCategory, newList, progress, units, type Template } from "../../model";
 import { at, nextWeekday, toLocalInput } from "../types";
 import { Field, FormError, SheetClose, type SheetProps as Props } from "../ui";
+import { formatLei, usePrices } from "../usePrices";
 import { t } from "../../i18n";
 
 export function ProductSheet({ app, sheet }: Props<"product">) {
   const { form, setForm, keyboard } = app;
+  const shopPrice = usePrices(form.name.trim() ? [form.name] : []).prices[form.name.trim()];
   return (
     <form className="sheet-form" onSubmit={app.saveProduct}>
       <SheetClose app={app} />
@@ -40,6 +42,11 @@ export function ProductSheet({ app, sheet }: Props<"product">) {
       <Field label={<>{t("Примечание")} <span>{t("Необязательно")}</span></>}><KeyboardInput placeholder={t("Например, для запекания")} value={form.note} onChange={(event) => { const note = event.target.value; setForm((previous) => ({ ...previous, note })); }} onBlur={() => keyboard.hide()} /></Field>
       <div className="sheet-actions">
         <button className="primary-button" disabled={!form.name.trim()}>{sheet.itemId ? t("Сохранить") : t("Добавить продукт")}</button>
+        {shopPrice && (
+          <a className="shop-price" href={shopPrice.url} target="_blank" rel="noopener">
+            {t("В Linella: {name} — {price}", { name: shopPrice.name, price: formatLei(shopPrice.price) })}{shopPrice.step ? ` ${shopPrice.step}` : ""}
+          </a>
+        )}
         {sheet.itemId && <button type="button" className="destructive-button" onClick={app.deleteProduct}><TrashIcon /> {t("Удалить продукт")}</button>}
       </div>
     </form>

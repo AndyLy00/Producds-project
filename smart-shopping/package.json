@@ -13,7 +13,7 @@
     "prebuild": "npm run check:runtime",
     "build": "tsc && vite build && node scripts/prepare-sites-build.mjs",
     "build:web": "tsc && vite build --config vite.android.config.ts --outDir dist/web",
-    "test:api": "node --test tests/api.test.mjs tests/merge.test.mjs tests/recipes.test.mjs tests/i18n.test.mjs",
+    "test:api": "node --test tests/api.test.mjs tests/merge.test.mjs tests/recipes.test.mjs tests/i18n.test.mjs tests/linella.test.mjs",
     "build:android": "tsc && vite build --config vite.android.config.ts && cap sync android",
     "apk": "npm run build:android && cd android && \"./gradlew\" assembleDebug"
   },

@@ -418,6 +418,11 @@ const ro: Record<string, string> = {
   "Сахар": "Zahăr",
   "Список пуст": "Lista este goală",
 
+  // Linella prices
+  "≈ {total} в Linella": "≈ {total} la Linella",
+  "осталось ≈ {left}": "rămas ≈ {left}",
+  "В Linella: {name} — {price}": "La Linella: {name} — {price}",
+
   // Times
   "{minutes} мин": "{minutes} min",
   "{hours} ч {minutes} мин": "{hours} h {minutes} min",

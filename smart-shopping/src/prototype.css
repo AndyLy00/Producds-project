@@ -492,3 +492,9 @@
 .family-invite { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 15px; background: var(--white); }
 .family-invite p { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.45; }
 .settings-link { display: block; margin: 14px 0 0; color: var(--muted); font-size: 11px; text-align: center; text-decoration: underline; }
+
+/* Linella prices (src/app/usePrices.ts) */
+.product-quantity .product-price { display: block; color: var(--muted); font-size: 10px; font-weight: 600; text-align: right; white-space: nowrap; }
+.price-total { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--green); font-size: 12px; font-weight: 700; }
+.price-total span:last-child:not(:first-child) { color: var(--muted); font-weight: 600; }
+.shop-price { display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; }

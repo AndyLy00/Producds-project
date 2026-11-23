@@ -3,6 +3,7 @@ import { BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIco
 import { useState, type ReactNode } from "react";
 import { formatReminder, productImage, type ShoppingItem, type ShoppingList } from "../model";
 import { usePhoto } from "../photos";
+import { formatLei } from "./usePrices";
 import type { DragHandle } from "../sortable";
 import type { Sheet, SheetOf } from "./types";
 import type { ShoppingApp } from "./useShoppingApp";
@@ -11,14 +12,15 @@ import { t } from "../i18n";
 // Props of the sheet that renders one kind of Sheet.
 export type SheetProps<K extends Sheet["kind"]> = { app: ShoppingApp; sheet: SheetOf<K> };
 
-export function ProductRow({ item, handle, onToggle, onEdit, onFavorite }: { item: ShoppingItem; handle?: DragHandle; onToggle: () => void; onEdit: () => void; onFavorite: () => void }) {
+// `cost`: what the item would cost at Linella, in bani (src/app/usePrices.ts).
+export function ProductRow({ item, handle, onToggle, onEdit, onFavorite, cost }: { item: ShoppingItem; handle?: DragHandle; onToggle: () => void; onEdit: () => void; onFavorite: () => void; cost?: number }) {
   const image = productImage(item.name);
   return <div className={`product-row ${item.purchased ? "product-row-done" : ""}`}>
     {handle && <span className="drag-handle" aria-label={t("Перетащить {name}", { name: item.name })} {...handle}><DragHandleDots2Icon /></span>}
     <button className={`check-button ${item.purchased ? "checked" : ""}`} onClick={onToggle} aria-label={item.purchased ? t("Вернуть {name} в список", { name: item.name }) : t("Отметить {name} купленным", { name: item.name })}>{item.purchased && <CheckIcon />}</button>
     {image ? <img className="product-art" src={image} alt="" /> : <span className="product-art product-art-placeholder" aria-hidden="true">{item.name.slice(0, 1).toLocaleUpperCase("ru")}</span>}
     <button className="product-main" onClick={onEdit}><span className="product-name">{item.name}</span><small className="product-note">{[t(item.category), item.note].filter(Boolean).join(" · ")}</small></button>
-    <span className="product-quantity">{item.quantity} {t(item.unit)}</span>
+    <span className="product-quantity">{item.quantity} {t(item.unit)}{cost !== undefined && <small className="product-price">≈ {formatLei(cost)}</small>}</span>
     <button className={`favorite-button ${item.favorite ? "favorite-active" : ""}`} onClick={onFavorite} aria-label={item.favorite ? t("Убрать из избранного") : t("В избранное")}>{item.favorite ? <StarFilledIcon /> : <StarIcon />}</button>
   </div>;
 }

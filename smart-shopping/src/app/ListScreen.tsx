@@ -4,6 +4,7 @@ import { KeyboardInput, MobileScroll } from "../mobile";
 import { alive, progress, sortItems, type ShoppingItem, type ShoppingList } from "../model";
 import { Sortable, type DragHandle } from "../sortable";
 import { ListBadges, ProductRow } from "./ui";
+import { formatLei, itemCost, usePrices } from "./usePrices";
 import type { ShoppingApp } from "./useShoppingApp";
 import { t } from "../i18n";
 
@@ -16,6 +17,11 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
   const filteredItems = activeItems.filter((item) => !search || `${item.name} ${item.category} ${t(item.category)} ${item.note}`.toLocaleLowerCase().includes(search));
   const manual = list.sortMode === "manual" && !search;
   const { bought, total, left, percent } = progress(list);
+  // Linella's prices, when it has products of these names (api/prices.js).
+  const { prices } = usePrices(items.map((item) => item.name));
+  const costs = new Map(items.map((item) => [item.id, itemCost(item, prices[item.name.trim()])]));
+  const sum = (entries: ShoppingItem[]) => entries.reduce((total, item) => total + (costs.get(item.id) ?? 0), 0);
+  const priced = items.some((item) => costs.get(item.id) !== undefined);
 
   const productRow = (item: ShoppingItem, handle?: DragHandle) => (
     <ProductRow
@@ -24,6 +30,7 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
       onToggle={() => app.patchItem(list.id, item.id, { purchased: !item.purchased })}
       onEdit={() => app.openProductSheet(item)}
       onFavorite={() => app.patchItem(list.id, item.id, { favorite: !item.favorite })}
+      cost={costs.get(item.id)}
     />
   );
 
@@ -52,6 +59,12 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
           <section className="progress-block" aria-label={t("Прогресс покупок")}>
             <div className="progress-copy"><span>{t("{bought} из {total} куплено", { bought, total })}</span><span>{Math.round(percent)}%</span></div>
             <div className="progress-track"><span style={{ width: `${percent}%` }} /></div>
+            {priced && (
+              <div className="price-total">
+                <span>{t("≈ {total} в Linella", { total: formatLei(sum(items)) })}</span>
+                {left > 0 && bought > 0 && <span>{t("осталось ≈ {left}", { left: formatLei(sum(activeItems)) })}</span>}
+              </div>
+            )}
           </section>
 
           <div className="list-tools">
