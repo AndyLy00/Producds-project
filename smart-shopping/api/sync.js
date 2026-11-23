@@ -7,6 +7,7 @@
 // `since`, the merged profile, and the ids of sent lists the account no longer has access to.
 import { HttpError, authenticate, database, json, preflight, readJson, route } from "./_lib.js";
 import { cleanList, cleanProfile, emptyProfile } from "./_clean.js";
+import { removeUnusedPhotos } from "./_photos.js";
 import { mergeList, mergeProfile, pruneList, pruneProfile } from "../shared/merge.js";
 
 // Merging also drops tombstones that have outlived their purpose (shared/merge.js).
@@ -76,6 +77,7 @@ export const POST = route(async (request) => {
   const profile = incomingProfile
     ? await saveMerged(profiles, { _id: user._id }, incomingProfile, mergeStoredProfile, { _id: user._id, data: incomingProfile })
     : ((await profiles.findOne({ _id: user._id }))?.data ?? emptyProfile());
+  if (incomingProfile) await removeUnusedPhotos(db, user._id, profile);
 
   const changed = await lists.find({ members: user._id, serverUpdatedAt: { $gt: since - CLOCK_MARGIN } }).toArray();
   const shared = await lists

@@ -19,6 +19,9 @@ export type Sheet =
   | { kind: "delete-account" };
 export type SheetOf<K extends Sheet["kind"]> = Extract<Sheet, { kind: K }>;
 export type Toast = { text: string; undo?: ShoppingData };
+// A step being edited: `minutes` as typed; `auto` while they still follow the step's text.
+export type StepForm = { id: string; text: string; minutes: string; auto: boolean };
+export type RecipeForm = { name: string; ingredients: string; photo?: string; steps: StepForm[] };
 
 export const blankProduct = (): Product => ({ name: "", quantity: "1", unit: "шт.", category: "", note: "" });
 export const errorText = (error: unknown) => (error instanceof Error ? error.message : "Что-то пошло не так. Попробуйте ещё раз.");

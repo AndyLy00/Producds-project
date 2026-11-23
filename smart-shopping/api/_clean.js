@@ -5,6 +5,9 @@ import { dropOldTombstones } from "../shared/merge.js";
 const text = (value, max) => (typeof value === "string" ? value.slice(0, max) : "");
 const time = (value) => (Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0);
 const validId = (value) => typeof value === "string" && value.length > 0 && value.length <= 100;
+// Photo ids are random and made by the app (src/photos.ts), so a photo can be referenced before
+// it is uploaded.
+export const validPhotoId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{20,64}$/.test(value);
 const tombstone = (entity) => (entity.deleted === true ? { deleted: true } : {});
 
 // The newest copy of an entity wins a merge, so a change stamped far in the future (a phone with
@@ -88,8 +91,14 @@ export function cleanProfile(value) {
     recipes: entities(value.recipes, 300, (recipe) => ({
       id: recipe.id,
       name: text(recipe.name, 120),
-      note: text(recipe.note, 2000),
+      note: text(recipe.note, 5000),
       ingredients: many(recipe.ingredients, 100, product),
+      steps: many(recipe.steps, 60, (step) => ({
+        id: validId(step.id) ? step.id : "",
+        text: text(step.text, 1000),
+        ...(Number.isFinite(step.minutes) && step.minutes > 0 ? { minutes: Math.min(Math.round(step.minutes), 24 * 60) } : {}),
+      })).filter((step) => step.id),
+      ...(validPhotoId(recipe.photo) ? { photo: recipe.photo } : {}),
       updatedAt: stamp(recipe.updatedAt),
       ...tombstone(recipe),
     })),

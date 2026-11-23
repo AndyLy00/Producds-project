@@ -1,7 +1,8 @@
 // Small building blocks shared by the screens and sheets.
 import { BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIcon, PersonIcon, PlusIcon, StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { formatReminder, type ShoppingItem, type ShoppingList } from "../model";
+import { usePhoto } from "../photos";
 import type { DragHandle } from "../sortable";
 import type { Sheet, SheetOf } from "./types";
 import type { ShoppingApp } from "./useShoppingApp";
@@ -51,6 +52,14 @@ export function ListBadges({ app, list }: { app: ShoppingApp; list: ShoppingList
       {list.remindAt && <span className={`badge ${list.remindAt < Date.now() ? "badge-alert" : ""}`}><BellIcon /> {formatReminder(list.remindAt)}</span>}
     </span>
   );
+}
+
+// A recipe photo, or the fallback when there is none (or it cannot be loaded).
+export function RecipePhoto({ id, className, fallback = null }: { id?: string; className: string; fallback?: ReactNode }) {
+  const source = usePhoto(id);
+  const [failed, setFailed] = useState<string | null>(null);
+  if (!source || failed === source) return <>{fallback}</>;
+  return <img className={className} src={source} alt="" onError={() => setFailed(source)} />;
 }
 
 export function Field({ label, children }: { label: ReactNode; children: ReactNode }) {

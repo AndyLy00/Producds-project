@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useKeyboard } from "../mobile";
 import { useCloudSync, type Member } from "../cloud-sync";
-import { allowReminders, isNativeApp, onReminderOpened, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
+import { allowBrowserNotifications, allowReminders, exactAlarmsAllowed, isNativeApp, onNotificationOpened, openExactAlarmSettings, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
+import { forgetPhotosExcept, newPhotoId, savePhoto, shrinkPhoto } from "../photos";
 import {
   addProducts,
   alive,
@@ -13,6 +14,7 @@ import {
   emptyData,
   formatReminder,
   guessCategory,
+  guessMinutes,
   listAsText,
   newList,
   parseProducts,
@@ -20,6 +22,8 @@ import {
   progress,
   restore,
   sortItems,
+  stepsAsNote,
+  stepsOf,
   suggestions,
   toProduct,
   type Product,
@@ -31,7 +35,8 @@ import {
 } from "../model";
 import { loadShoppingData, saveShoppingData } from "../shopping-data";
 import { moveItem } from "../sortable";
-import { blankProduct, errorText, inviteFromAddress, type AccountStep, type Sheet, type Tab, type Toast } from "./types";
+import { blankProduct, errorText, inviteFromAddress, type AccountStep, type RecipeForm, type Sheet, type Tab, type Toast } from "./types";
+import { useTimers } from "./useTimers";
 
 export type ShoppingApp = ReturnType<typeof useShoppingApp>;
 
@@ -47,7 +52,10 @@ export function useShoppingApp() {
   const [quickName, setQuickName] = useState("");
   const [showPurchased, setShowPurchased] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
-  const [recipeForm, setRecipeForm] = useState({ name: "", ingredients: "", note: "" });
+  const [recipeForm, setRecipeForm] = useState<RecipeForm>({ name: "", ingredients: "", steps: [] });
+  // Cooking mode: the recipe being cooked and the step on screen.
+  const [cooking, setCooking] = useState<{ recipeId: string; step: number } | null>(null);
+  const [exactAlarms, setExactAlarms] = useState(true);
   const [storeForm, setStoreForm] = useState({ name: "", order: [] as string[] });
   const [categoryName, setCategoryName] = useState("");
   const [reminderValue, setReminderValue] = useState("");
@@ -64,6 +72,7 @@ export function useShoppingApp() {
   const cloud = useCloudSync(data, setData, ready, notify);
   const cloudRef = useRef(cloud);
   cloudRef.current = cloud;
+  const timers = useTimers((timer) => setToast({ text: `Готово: ${timer.label}` }));
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +104,7 @@ export function useShoppingApp() {
   useEffect(() => {
     const onBack = (event: Event) => {
       if (sheet !== null) setSheet(null);
+      else if (cooking !== null) setCooking(null);
       else if (currentListId !== null) setCurrentListId(null);
       else if (tab !== "lists") setTab("lists");
       else return;
@@ -102,7 +112,7 @@ export function useShoppingApp() {
     };
     window.addEventListener("app:back", onBack);
     return () => window.removeEventListener("app:back", onBack);
-  }, [sheet, currentListId, tab]);
+  }, [sheet, cooking, currentListId, tab]);
 
   useEffect(() => {
     if (!toast) return;
@@ -123,7 +133,20 @@ export function useShoppingApp() {
   useEffect(() => {
     if (ready) updateWidget(activeLists[0]);
   }, [ready, activeLists]);
-  useEffect(() => onReminderOpened((listId) => { setSheet(null); setTab("lists"); setCurrentListId(listId); }), []);
+  useEffect(() => onNotificationOpened(
+    (listId) => { setSheet(null); setCooking(null); setTab("lists"); setCurrentListId(listId); },
+    (recipeId, stepId) => {
+      const recipe = dataRef.current.recipes.find((entry) => entry.id === recipeId && !entry.deleted);
+      if (!recipe) return;
+      setSheet(null);
+      setCooking({ recipeId, step: Math.max(0, stepsOf(recipe).findIndex((step) => step.id === stepId)) });
+    },
+  ), []);
+
+  // Device copies of photos that no recipe uses any more are dropped once the data is loaded.
+  useEffect(() => {
+    if (ready) void forgetPhotosExcept(new Set(alive(dataRef.current.recipes).flatMap((recipe) => (recipe.photo ? [recipe.photo] : []))));
+  }, [ready]);
 
   // Links opened in the Android app: invitations and the return from Google sign-in.
   useEffect(() => {
@@ -414,22 +437,106 @@ export function useShoppingApp() {
   // --- Profile -------------------------------------------------------------------------------------
 
   function openRecipe(recipe?: Recipe) {
-    setRecipeForm(recipe ? { name: recipe.name, ingredients: productsAsText(recipe.ingredients), note: recipe.note } : { name: "", ingredients: "", note: "" });
+    setRecipeForm(recipe
+      ? { name: recipe.name, ingredients: productsAsText(recipe.ingredients), photo: recipe.photo, steps: stepsOf(recipe).map((step) => ({ id: step.id, text: step.text, minutes: step.minutes ? String(step.minutes) : "", auto: false })) }
+      : { name: "", ingredients: "", steps: [{ id: createId(), text: "", minutes: "", auto: true }] });
     openSheet({ kind: "recipe", recipeId: recipe?.id });
   }
 
   function saveRecipe(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sheet?.kind !== "recipe" || !recipeForm.name.trim()) return;
+    const steps = recipeForm.steps
+      .filter((step) => step.text.trim())
+      .map((step) => {
+        const minutes = Math.round(Number(step.minutes));
+        return { id: step.id, text: step.text.trim(), ...(minutes > 0 ? { minutes: Math.min(minutes, 24 * 60) } : {}) };
+      });
     saveEntity("recipes", {
       id: sheet.recipeId ?? createId(),
       name: recipeForm.name.trim(),
-      note: recipeForm.note.trim(),
+      note: stepsAsNote(steps),
       ingredients: parseProducts(recipeForm.ingredients, categories),
+      steps,
+      ...(recipeForm.photo ? { photo: recipeForm.photo } : {}),
       updatedAt: Date.now(),
     });
     closeSheet();
     notify("Рецепт сохранён");
+  }
+
+  // Steps in the recipe form. Until the minutes of a step are typed by hand, they follow the
+  // duration found in its text ("варить 10 минут").
+  function editStep(stepId: string, patch: { text?: string; minutes?: string }) {
+    setRecipeForm((previous) => ({
+      ...previous,
+      steps: previous.steps.map((step) => {
+        if (step.id !== stepId) return step;
+        if (patch.minutes !== undefined) return { ...step, minutes: patch.minutes.replace(/\D/g, "").slice(0, 4), auto: false };
+        const text = patch.text ?? step.text;
+        const guessed = guessMinutes(text);
+        return { ...step, text, minutes: step.auto ? (guessed ? String(guessed) : "") : step.minutes };
+      }),
+    }));
+  }
+
+  function addStep() {
+    setRecipeForm((previous) => ({ ...previous, steps: [...previous.steps, { id: createId(), text: "", minutes: "", auto: true }] }));
+  }
+
+  function removeStep(stepId: string) {
+    setRecipeForm((previous) => ({ ...previous, steps: previous.steps.filter((step) => step.id !== stepId) }));
+  }
+
+  function moveStep(from: number, to: number) {
+    setRecipeForm((previous) => ({ ...previous, steps: moveItem(previous.steps, from, to) }));
+  }
+
+  async function pickRecipePhoto(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setFormError("");
+    try {
+      const id = newPhotoId();
+      await savePhoto(id, await shrinkPhoto(file));
+      setRecipeForm((previous) => ({ ...previous, photo: id }));
+    } catch {
+      setFormError("Не удалось открыть фото. Попробуйте другое.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function removeRecipePhoto() {
+    setRecipeForm((previous) => ({ ...previous, photo: undefined }));
+  }
+
+  // --- Cooking -------------------------------------------------------------------------------------
+
+  function startCooking(recipe: Recipe) {
+    closeSheet();
+    setCooking({ recipeId: recipe.id, step: 0 });
+    allowBrowserNotifications();
+    void exactAlarmsAllowed().then(setExactAlarms);
+  }
+
+  function goToStep(step: number) {
+    setCooking((previous) => (previous ? { ...previous, step } : previous));
+  }
+
+  function stopCooking() {
+    setCooking(null);
+  }
+
+  async function startStepTimer(recipe: Recipe, index: number) {
+    const step = stepsOf(recipe)[index];
+    if (!step) return;
+    const onTime = await timers.start(recipe, step, index);
+    if (!onTime) setExactAlarms(await exactAlarmsAllowed());
+  }
+
+  async function allowExactAlarms() {
+    setExactAlarms(await openExactAlarmSettings());
   }
 
   function openStore(store?: Store, forListId?: string) {
@@ -569,6 +676,7 @@ export function useShoppingApp() {
   const storeName = (list: ShoppingList) => data.stores.find((store) => store.id === list.storeId && !store.deleted)?.name;
   const sheetList = sheet && "listId" in sheet && sheet.listId ? data.lists.find((list) => list.id === sheet.listId) ?? null : null;
   const hints = suggestions(data, quickName, currentList);
+  const cookingRecipe = cooking ? alive(data.recipes).find((recipe) => recipe.id === cooking.recipeId) ?? null : null;
 
   return {
     // State
@@ -577,12 +685,14 @@ export function useShoppingApp() {
     categoryName, setCategoryName, reminderValue, setReminderValue, credentials, setCredential, formError, busy,
     shareState, setShareState, googleButton, keyboard, cloud,
     // Derived
-    activeLists, history, categories, currentList, favorites, storeName, sheetList, hints,
+    activeLists, history, categories, currentList, favorites, storeName, sheetList, hints, cooking, cookingRecipe, timers, exactAlarms,
     // Actions
     notify, undo, patchList, patchItem, removeEntity, toggleDarkMode, openSheet, closeSheet,
     openList, closeList: () => setCurrentListId(null), startNewList, addList, submitListName, deleteList, completeList, repeatList, saveAsTemplate, sendAsText,
     openProductSheet, saveProduct, addQuick, quickAdd, deleteProduct, clearPurchased, toggleSortMode, reorder, addProductsTo, addToSomeList,
-    openRecipe, saveRecipe, openStore, saveStore, openCategories, addCategory, setReminder,
+    openRecipe, saveRecipe, editStep, addStep, removeStep, moveStep, pickRecipePhoto, removeRecipePhoto,
+    startCooking, goToStep, stopCooking, startStepTimer, allowExactAlarms,
+    openStore, saveStore, openCategories, addCategory, setReminder,
     openAccount, run, submitAccount, openPasswordSheet, openDeleteAccount, startVerification, signOut, openShare,
   };
 }

@@ -15,8 +15,8 @@ let db;
 
 before(async () => {
   if (skip) return;
-  const [auth, sync, share, lib] = await Promise.all([import("../api/auth.js"), import("../api/sync.js"), import("../api/share.js"), import("../api/_lib.js")]);
-  api = { auth: auth.POST, config: auth.GET, sync: sync.POST, share: share.POST };
+  const [auth, sync, share, photo, lib] = await Promise.all([import("../api/auth.js"), import("../api/sync.js"), import("../api/share.js"), import("../api/photo.js"), import("../api/_lib.js")]);
+  api = { auth: auth.POST, config: auth.GET, sync: sync.POST, share: share.POST, photoUpload: photo.POST, photoGet: photo.GET };
   db = await lib.database();
 });
 
@@ -285,4 +285,65 @@ test("removed products never push out live ones, and old removals are forgotten"
   const saved = result.body.lists.find((entry) => entry.id === "T1");
   assert.ok(saved.items.some((entry) => entry.id === "live" && !entry.deleted));
   assert.ok(!saved.items.some((entry) => entry.id === "ancient"));
+});
+
+const photoBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 0xff, 0xd9]);
+const photoRequest = (id, { token, body = photoBytes, type = "image/jpeg" } = {}) =>
+  new Request(`https://korzina.example/api/photo?id=${id}`, {
+    method: body === null ? "GET" : "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === null ? {} : { "Content-Type": type }) },
+    body: body === null ? undefined : body,
+  });
+
+test("a recipe keeps its steps, timers and photo", { skip }, async () => {
+  const { token } = await register("cook@example.com");
+  const recipe = {
+    id: "r1",
+    name: "Плов",
+    note: "1. Обжарить\n2. Тушить",
+    ingredients: [],
+    steps: [{ id: "s1", text: "Обжарить", minutes: 7 }, { id: "s2", text: "Тушить", minutes: 99_999 }, { id: "", text: "без id" }],
+    photo: "p".repeat(32),
+    updatedAt: Date.now(),
+  };
+  const result = await call(api.sync, { lists: [], profile: profile({ recipes: [recipe] }), since: 0 }, { token });
+  const saved = result.body.profile.recipes[0];
+  assert.deepEqual(saved.steps, [{ id: "s1", text: "Обжарить", minutes: 7 }, { id: "s2", text: "Тушить", minutes: 1440 }]);
+  assert.equal(saved.photo, "p".repeat(32));
+  const bad = await call(api.sync, { lists: [], profile: profile({ recipes: [{ ...recipe, id: "r2", photo: "../etc" }] }), since: 0 }, { token });
+  assert.equal(bad.body.profile.recipes.find((entry) => entry.id === "r2").photo, undefined);
+});
+
+test("photos are uploaded by their owner, read by id, and limited in size and type", { skip }, async () => {
+  const { token } = await register("photo@example.com");
+  const { token: other } = await register("photo-other@example.com");
+  const id = "a".repeat(32);
+  assert.equal((await api.photoUpload(photoRequest(id))).status, 401, "needs a session");
+  assert.equal((await api.photoUpload(photoRequest("short", { token }))).status, 400);
+  assert.equal((await api.photoUpload(photoRequest(id, { token, type: "text/html" }))).status, 415);
+  assert.equal((await api.photoUpload(photoRequest(id, { token, body: new Uint8Array(900_000) }))).status, 413);
+  assert.equal((await api.photoUpload(photoRequest(id, { token }))).status, 201);
+  assert.equal((await api.photoUpload(photoRequest(id, { token }))).status, 200, "a retry is fine");
+  assert.equal((await api.photoUpload(photoRequest(id, { token: other }))).status, 409, "someone else's id is refused");
+
+  const read = await api.photoGet(photoRequest(id, { body: null }));
+  assert.equal(read.status, 200);
+  assert.equal(read.headers.get("content-type"), "image/jpeg");
+  assert.deepEqual(new Uint8Array(await read.arrayBuffer()), photoBytes);
+  assert.equal((await api.photoGet(photoRequest("b".repeat(32), { body: null }))).status, 404);
+});
+
+test("photos no recipe uses are removed after a day, and with the account", { skip }, async () => {
+  const { token } = await register("tidy@example.com", "tidy-password");
+  const used = "u".repeat(32);
+  const unused = "x".repeat(32);
+  const fresh = "f".repeat(32);
+  for (const id of [used, unused, fresh]) await api.photoUpload(photoRequest(id, { token }));
+  await db.collection("photos").updateMany({ _id: { $in: [used, unused] } }, { $set: { createdAt: new Date(Date.now() - 2 * 86_400_000) } });
+  const recipe = { id: "r", name: "Суп", note: "", ingredients: [], steps: [], photo: used, updatedAt: Date.now() };
+  await call(api.sync, { lists: [], profile: profile({ recipes: [recipe] }), since: 0 }, { token });
+  assert.deepEqual((await db.collection("photos").find({}, { projection: { _id: 1 } }).toArray()).map((photo) => photo._id).filter((id) => [used, unused, fresh].includes(id)).sort(), [fresh, used].sort());
+
+  await auth({ action: "delete-account", password: "tidy-password" }, { token });
+  assert.equal(await db.collection("photos").countDocuments({ _id: { $in: [used, fresh] } }), 0);
 });

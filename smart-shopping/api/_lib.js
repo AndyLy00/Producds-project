@@ -81,6 +81,7 @@ export async function database() {
     db.collection("invites").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("handoffs").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("lists").createIndex({ members: 1, serverUpdatedAt: 1 }),
+    db.collection("photos").createIndex({ owner: 1, createdAt: 1 }),
   ]);
   await indexesReady;
   return db;

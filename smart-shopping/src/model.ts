@@ -35,7 +35,11 @@ export type ShoppingList = {
 
 export type Store = { id: string; name: string; categoryOrder: string[]; updatedAt: number; deleted?: boolean };
 export type Template = { id: string; name: string; items: Product[]; updatedAt: number; deleted?: boolean };
-export type Recipe = { id: string; name: string; note: string; ingredients: Product[]; updatedAt: number; deleted?: boolean };
+// One step of cooking; `minutes` gives the step a timer.
+export type RecipeStep = { id: string; text: string; minutes?: number };
+// `note` is the plain-text form of the steps, kept for app versions that predate steps.
+// `photo` is the id of a photo (src/photos.ts).
+export type Recipe = { id: string; name: string; note: string; ingredients: Product[]; steps?: RecipeStep[]; photo?: string; updatedAt: number; deleted?: boolean };
 export type Category = { id: string; name: string; updatedAt: number; deleted?: boolean };
 export type Settings = { darkMode: boolean; updatedAt: number };
 // Received from the server for lists that more than one account has; never edited locally.
@@ -230,7 +234,12 @@ export function seedData(): ShoppingData {
       {
         id: "recipe-syrniki",
         name: "Сырники",
-        note: "Смешать творог, яйцо, муку и сахар, обжарить на среднем огне.",
+        note: "1. Смешать творог, яйцо, муку и сахар.\n2. Дать тесту постоять 10 минут.\n3. Обжарить с каждой стороны по 3 минуты на среднем огне.",
+        steps: [
+          { id: "recipe-syrniki-1", text: "Смешать творог, яйцо, муку и сахар." },
+          { id: "recipe-syrniki-2", text: "Дать тесту постоять 10 минут.", minutes: 10 },
+          { id: "recipe-syrniki-3", text: "Обжарить с каждой стороны по 3 минуты на среднем огне.", minutes: 6 },
+        ],
         updatedAt: 1,
         ingredients: [
           { name: "Творог", quantity: "400", unit: "г", category: "Молочные продукты", note: "" },
@@ -336,6 +345,44 @@ export function parseProducts(text: string, categories: string[]): Product[] {
       const category = guessCategory(cleanName);
       return { name: cleanName, quantity: quantity?.replace(",", ".") ?? "1", unit: normalizedUnit, category: categories.includes(category) ? category : categories[3], note: "" };
     });
+}
+
+// --- Recipe steps ------------------------------------------------------------------------------
+
+const durationPattern = /(\d+(?:[.,]\d+)?)(?:\s*[-–—]\s*(\d+(?:[.,]\d+)?))?\s*(час(?:а|ов)?|ч\.?|мин(?:ут[ауы]?|\.)?)(?![а-яё])/i;
+
+// "Варить 10–12 минут" → 12, "тушить 1,5 часа" → 90; nothing found → undefined.
+export function guessMinutes(text: string): number | undefined {
+  const match = durationPattern.exec(text);
+  if (!match) return undefined;
+  const value = Number((match[2] ?? match[1]).replace(",", "."));
+  const minutes = Math.round(/^ч/i.test(match[3]) ? value * 60 : value);
+  return minutes > 0 && minutes <= 24 * 60 ? minutes : undefined;
+}
+
+// The steps of a recipe. Recipes saved before steps existed keep their method in `note`: each
+// line becomes a step, so they are converted when read and nothing has to be migrated.
+export function stepsOf(recipe: Pick<Recipe, "id" | "note" | "steps">): RecipeStep[] {
+  if (recipe.steps?.length) return recipe.steps;
+  return recipe.note
+    .split("\n")
+    .map((line) => line.trim().replace(/^\d+[.)]\s*/, ""))
+    .filter(Boolean)
+    .map((text, index) => ({ id: `${recipe.id}-step-${index}`, text, minutes: guessMinutes(text) }));
+}
+
+export function stepsAsNote(steps: RecipeStep[]) {
+  return steps.map((step, index) => `${index + 1}. ${step.text}`).join("\n");
+}
+
+export function totalMinutes(steps: RecipeStep[]) {
+  return steps.reduce((sum, step) => sum + (step.minutes ?? 0), 0);
+}
+
+export function formatMinutes(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours ? `${hours} ч${rest ? ` ${rest} мин` : ""}` : `${rest} мин`;
 }
 
 export function productsAsText(products: Product[]) {

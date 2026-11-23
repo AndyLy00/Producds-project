@@ -176,6 +176,7 @@ const actions = {
     await Promise.all([
       db.collection("lists").deleteMany({ members: { $size: 0 } }),
       db.collection("profiles").deleteOne({ _id: user._id }),
+      db.collection("photos").deleteMany({ owner: user._id }),
       db.collection("codes").deleteMany({ _id: { $in: [`verify:${user._id}`, `reset:${user._id}`] } }),
       db.collection("users").deleteOne({ _id: user._id }),
     ]);

@@ -1,9 +1,9 @@
 // The tabs shown when no list is open: lists, favorites, recipes, history and settings.
-import { ArchiveIcon, BackpackIcon, CalendarIcon, ChevronRightIcon, ClockIcon, DotsHorizontalIcon, GearIcon, HomeIcon, PlusIcon, ReaderIcon, StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
+import { ArchiveIcon, BackpackIcon, CalendarIcon, ChevronRightIcon, ClockIcon, DotsHorizontalIcon, GearIcon, HomeIcon, PlayIcon, PlusIcon, ReaderIcon, StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
 import { MobileScroll } from "../mobile";
-import { alive, progress, toProduct } from "../model";
+import { alive, formatMinutes, progress, stepsOf, toProduct, totalMinutes } from "../model";
 import { SettingsTab } from "./SettingsTab";
-import { EmptyState, ListBadges, NavButton } from "./ui";
+import { EmptyState, ListBadges, NavButton, RecipePhoto } from "./ui";
 import type { ShoppingApp } from "./useShoppingApp";
 
 function ListsTab({ app }: { app: ShoppingApp }) {
@@ -56,12 +56,18 @@ function RecipesTab({ app }: { app: ShoppingApp }) {
   return <>
     <section className="welcome-block compact-welcome"><p className="eyebrow">ГОТОВИМ ДОМА</p><h1>Рецепты</h1><p className="welcome-subtitle">Ингредиенты попадают в список одним касанием.</p></section>
     <div className="section-title-row"><h2>Мои рецепты <span>{recipes.length}</span></h2><button className="text-action" onClick={() => app.openRecipe()}><PlusIcon /> Новый</button></div>
-    {recipes.length ? <div className="history-list">{recipes.map((recipe) => (
-      <div className="history-row recipe-row" key={recipe.id}>
-        <button className="favorite-row-main" onClick={() => app.openRecipe(recipe)}><span className="history-icon"><ReaderIcon /></span><span><b>{recipe.name}</b><small>{recipe.ingredients.map((entry) => entry.name).join(", ") || "Без ингредиентов"}</small></span></button>
-        <button className="history-repeat" onClick={() => app.addToSomeList(recipe.name, recipe.ingredients)}>В список</button>
-      </div>
-    ))}</div> : <EmptyState title="Пока нет рецептов" text="Добавьте рецепт, чтобы потом одним касанием перенести ингредиенты в список." />}
+    {recipes.length ? <div className="history-list">{recipes.map((recipe) => {
+      const steps = stepsOf(recipe);
+      const minutes = totalMinutes(steps);
+      const details = [recipe.ingredients.map((entry) => entry.name).join(", ") || "Без ингредиентов", steps.length ? `${steps.length} шаг.` : "", minutes ? formatMinutes(minutes) : ""].filter(Boolean).join(" · ");
+      return (
+        <div className="history-row recipe-row" key={recipe.id}>
+          <button className="favorite-row-main" onClick={() => app.openRecipe(recipe)}><RecipePhoto id={recipe.photo} className="recipe-thumb" fallback={<span className="history-icon"><ReaderIcon /></span>} /><span><b>{recipe.name}</b><small>{details}</small></span></button>
+          {steps.length > 0 && <button className="recipe-cook" aria-label={`Готовить ${recipe.name}`} onClick={() => app.startCooking(recipe)}><PlayIcon /></button>}
+          <button className="history-repeat" onClick={() => app.addToSomeList(recipe.name, recipe.ingredients)}>В список</button>
+        </div>
+      );
+    })}</div> : <EmptyState title="Пока нет рецептов" text="Добавьте рецепт, чтобы потом одним касанием перенести ингредиенты в список." />}
   </>;
 }
 

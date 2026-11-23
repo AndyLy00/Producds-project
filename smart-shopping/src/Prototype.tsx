@@ -3,6 +3,7 @@
 import { Cross2Icon } from "@radix-ui/react-icons";
 import type { CSSProperties } from "react";
 import { useKeyboardInsets } from "./mobile";
+import { CookingScreen } from "./app/CookingScreen";
 import { HomeScreen } from "./app/HomeScreen";
 import { ListScreen } from "./app/ListScreen";
 import { AppSheet } from "./app/sheets";
@@ -15,7 +16,9 @@ export default function Prototype() {
 
   return (
     <div className={`shopping-app ${app.data.settings.darkMode ? "theme-dark" : ""}`} style={{ "--mobile-safe-area-height": `${bottomInset}px` } as CSSProperties}>
-      {app.currentList ? <ListScreen app={app} list={app.currentList} /> : <HomeScreen app={app} />}
+      {app.cooking && app.cookingRecipe
+        ? <CookingScreen app={app} recipe={app.cookingRecipe} stepIndex={app.cooking.step} />
+        : app.currentList ? <ListScreen app={app} list={app.currentList} /> : <HomeScreen app={app} />}
       <AppSheet app={app} />
       {toast && (
         <div className="toast" role="status">

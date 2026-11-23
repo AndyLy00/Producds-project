@@ -4,11 +4,10 @@
 // and from people sharing a list every few seconds while the app is open. Both copies are merged
 // per entity (model.ts, shared/merge.js), so edits made on several devices at once are all kept.
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { API_ORIGIN } from "./api-origin";
+import { uploadPendingPhotos } from "./photos";
 import { isDemoList, mergeData, profileOf, type ShoppingData, type ShoppingList, type Profile, type Sharing } from "./model";
 
-// Absolute because the Android app is not served from this origin. VITE_API_ORIGIN points a
-// local build at another server.
-export const API_ORIGIN: string = import.meta.env.VITE_API_ORIGIN ?? "https://korzina-peach.vercel.app";
 const SESSION_KEY = "smart-shopping.account.v2";
 const VERIFIER_KEY = "smart-shopping.google-verifier";
 const PUSH_DELAY = 700;
@@ -20,6 +19,8 @@ type SyncResponse = { lists: ShoppingList[]; profile: Profile; sharing: Sharing;
 export type SyncStatus = "idle" | "syncing" | "synced" | "error";
 export type AuthConfig = { googleClientId: string | null; email: boolean };
 export type Member = { email: string; owner: boolean; you: boolean };
+
+export { API_ORIGIN };
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
@@ -101,6 +102,8 @@ export function useCloudSync(
     const full = dirtyRef.current || current.since === 0;
     dirtyRef.current = false;
     const sent = dataRef.current;
+    // Photos first, so that the recipes sent below never point at a photo the server lacks.
+    await uploadPendingPhotos(current.token);
     try {
       const result = await api<SyncResponse>(
         "/api/sync",
