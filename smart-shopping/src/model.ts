@@ -11,6 +11,11 @@ export const defaultCategories = ["Овощи и фрукты", "Мясо и р�
 // Stored as written here whatever the language (src/i18n.ts); t() translates them for display.
 export const units = ["шт.", "кг", "г", "л", "мл", "уп."];
 
+// A shop product sold as a pack of pieces: "Яйца С1 10шт", "Ouă 10 buc.", "Eggs 6 pcs".
+export function countsPieces(productName: string) {
+  return /\d+\s*(шт|buc|pcs)/i.test(productName);
+}
+
 // Units as people type them in any of the app's languages.
 const unitAliases: Record<string, string> = {
   "шт": "шт.", "pcs": "шт.", "pc": "шт.", "buc": "шт.",

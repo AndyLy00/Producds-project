@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../cloud-sync";
 import { locale } from "../i18n";
-import { units, type ShoppingItem } from "../model";
+import { countsPieces, units, type ShoppingItem } from "../model";
 
 export type ShopPrice = { price: number; perKg?: number; step?: string; oldPrice?: number; name: string; url: string; matches: number };
 type Answer = { store: string; updatedAt: string | null; prices: Record<string, ShopPrice | null> };
@@ -41,7 +41,7 @@ export function itemCost(item: Pick<ShoppingItem, "quantity" | "unit">, price: S
   if (price.perKg && item.unit === kg) return Math.round(price.perKg * quantity);
   if (price.perKg && item.unit === grams) return Math.round((price.perKg * quantity) / 1000);
   // "Eggs 10 pcs" asked for, "Яйца С1 10шт" found: one package, not ten.
-  if (item.unit === pieces && /\d+\s*(шт|buc|pcs)/i.test(price.name)) return price.price;
+  if (item.unit === pieces && countsPieces(price.name)) return price.price;
   if ([pieces, packs, kg, litres].includes(item.unit)) return Math.round(price.price * quantity);
   return price.price;
 }
