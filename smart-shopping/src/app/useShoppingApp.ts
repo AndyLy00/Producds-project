@@ -37,6 +37,7 @@ import { loadShoppingData, saveShoppingData } from "../shopping-data";
 import { moveItem } from "../sortable";
 import { blankProduct, errorText, inviteFromAddress, type AccountStep, type Invite, type RecipeForm, type Sheet, type Tab, type Toast } from "./types";
 import { useTimers } from "./useTimers";
+import { language, setLanguage, t, type Language } from "../i18n";
 
 export type ShoppingApp = ReturnType<typeof useShoppingApp>;
 
@@ -56,6 +57,8 @@ export function useShoppingApp() {
   // Cooking mode: the recipe being cooked and the step on screen.
   const [cooking, setCooking] = useState<{ recipeId: string; step: number } | null>(null);
   const [exactAlarms, setExactAlarms] = useState(true);
+  // Changing it re-renders the whole app in the new language (src/i18n.ts).
+  const [lang, setLang] = useState<Language>(language);
   const [storeForm, setStoreForm] = useState({ name: "", order: [] as string[] });
   const [categoryName, setCategoryName] = useState("");
   const [reminderValue, setReminderValue] = useState("");
@@ -73,7 +76,7 @@ export function useShoppingApp() {
   const cloud = useCloudSync(data, setData, ready, notify);
   const cloudRef = useRef(cloud);
   cloudRef.current = cloud;
-  const timers = useTimers((timer) => setToast({ text: `Готово: ${timer.label}` }));
+  const timers = useTimers((timer) => setToast({ text: t("Готово: {label}", { label: timer.label }) }));
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +91,10 @@ export function useShoppingApp() {
   useEffect(() => {
     if (ready) void saveShoppingData(data);
   }, [data, ready]);
+
+  useEffect(() => {
+    document.title = t("Корзина — список покупок");
+  }, [lang]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("smart-shopping-dark", data.settings.darkMode);
@@ -166,7 +173,7 @@ export function useShoppingApp() {
         else if (familyInvite) setPendingInvite({ kind: "family", token: familyInvite });
         const code = url.protocol === "korzina:" && url.host === "auth" ? url.searchParams.get("code") : null;
         if (code) {
-          cloudRef.current.account.finishAppGoogleLogin(code).then(() => { setSheet(null); notify("Вы вошли через Google"); }, (error) => notify(errorText(error)));
+          cloudRef.current.account.finishAppGoogleLogin(code).then(() => { setSheet(null); notify(t("Вы вошли через Google")); }, (error) => notify(errorText(error)));
         }
       }
     };
@@ -179,7 +186,7 @@ export function useShoppingApp() {
     if (!pendingInvite || !ready) return;
     if (!cloud.email) {
       openAccount("login");
-      setFormError(pendingInvite.kind === "family" ? "Войдите или создайте аккаунт, чтобы присоединиться к семье." : "Войдите или создайте аккаунт, чтобы присоединиться к списку.");
+      setFormError(pendingInvite.kind === "family" ? t("Войдите или создайте аккаунт, чтобы присоединиться к семье.") : t("Войдите или создайте аккаунт, чтобы присоединиться к списку."));
       return;
     }
     const { kind, token } = pendingInvite;
@@ -192,7 +199,7 @@ export function useShoppingApp() {
       return;
     }
     cloud.share.join(token).then(
-      ({ listId, name }) => { setSheet(null); setTab("lists"); setCurrentListId(listId); notify(`Вы присоединились к списку «${name}»`); },
+      ({ listId, name }) => { setSheet(null); setTab("lists"); setCurrentListId(listId); notify(t("Вы присоединились к списку «{name}»", { name })); },
       (error) => notify(errorText(error)),
     );
   }, [pendingInvite, ready, cloud.email]);
@@ -204,7 +211,7 @@ export function useShoppingApp() {
     const clientId = cloud.config.googleClientId;
     if (!element || !clientId || isNativeApp || (accountStep !== "login" && accountStep !== "register")) return;
     renderGoogleButton(element, clientId, (credential) => {
-      cloudRef.current.account.googleCredential(credential).then(() => { setSheet(null); notify("Вы вошли через Google"); }, (error) => setFormError(errorText(error)));
+      cloudRef.current.account.googleCredential(credential).then(() => { setSheet(null); notify(t("Вы вошли через Google")); }, (error) => setFormError(errorText(error)));
     }).catch(() => undefined);
   }, [accountStep, cloud.config.googleClientId]);
 
@@ -225,7 +232,7 @@ export function useShoppingApp() {
     const before = toast?.undo;
     if (!before) return;
     change((current) => restore(before, current));
-    setToast({ text: "Действие отменено" });
+    setToast({ text: t("Действие отменено") });
   }
 
   function editList(listId: string, edit: (list: ShoppingList) => ShoppingList) {
@@ -293,7 +300,7 @@ export function useShoppingApp() {
     if (!listName.trim() || sheet?.kind !== "list") return;
     if (sheet.listId) {
       patchList(sheet.listId, { name: listName.trim() });
-      notify("Название списка изменено");
+      notify(t("Название списка изменено"));
       closeSheet();
     } else {
       addList(newList(listName));
@@ -306,10 +313,10 @@ export function useShoppingApp() {
     const sharing = data.sharing[list.id];
     // Someone else's list shared with the user alone is left; a family list is removed for all.
     if (sharing && !sharing.owner && !sharing.family) {
-      cloud.share.leave(list.id).then(() => notify("Вы вышли из совместного списка"), (error) => notify(errorText(error)));
+      cloud.share.leave(list.id).then(() => notify(t("Вы вышли из совместного списка")), (error) => notify(errorText(error)));
       return;
     }
-    undoable("Список удалён", (previous) => ({
+    undoable(t("Список удалён"), (previous) => ({
       ...previous,
       lists: previous.lists.map((entry) => (entry.id === list.id ? { ...entry, deleted: true, updatedAt: Date.now() } : entry)),
     }));
@@ -318,7 +325,7 @@ export function useShoppingApp() {
   function completeList(list: ShoppingList) {
     setSheet(null);
     setCurrentListId(null);
-    undoable("Список перемещён в историю", (previous) => ({
+    undoable(t("Список перемещён в историю"), (previous) => ({
       ...previous,
       lists: previous.lists.map((entry) => (entry.id === list.id ? { ...entry, completedAt: Date.now(), remindAt: undefined, updatedAt: Date.now() } : entry)),
     }));
@@ -331,13 +338,13 @@ export function useShoppingApp() {
   function saveAsTemplate(list: ShoppingList) {
     saveEntity("templates", { id: createId(), name: list.name, items: alive(list.items).map(toProduct), updatedAt: Date.now() });
     setSheet(null);
-    notify(`Шаблон «${list.name}» сохранён`);
+    notify(t("Шаблон «{name}» сохранён", { name: list.name }));
   }
 
   async function sendAsText(list: ShoppingList) {
     const result = await shareText(list.name, listAsText(list));
-    if (result === "copied") notify("Список скопирован — вставьте его в сообщение");
-    if (result === "failed") notify("Не удалось отправить список");
+    if (result === "copied") notify(t("Список скопирован — вставьте его в сообщение"));
+    if (result === "failed") notify(t("Не удалось отправить список"));
   }
 
   // --- Products ------------------------------------------------------------------------------------
@@ -353,10 +360,10 @@ export function useShoppingApp() {
     const product = { ...form, name: form.name.trim(), category: form.category || guessCategory(form.name) };
     if (sheet.itemId) {
       patchItem(currentList.id, sheet.itemId, product);
-      notify("Изменения сохранены");
+      notify(t("Изменения сохранены"));
     } else {
       editList(currentList.id, (list) => addProducts(list, [product]));
-      notify("Добавлено в список");
+      notify(t("Добавлено в список"));
     }
     closeSheet();
   }
@@ -372,14 +379,14 @@ export function useShoppingApp() {
     if (!quickName.trim()) return;
     addQuick({ ...blankProduct(), name: quickName.trim(), category: guessCategory(quickName) });
     keyboard.hide();
-    notify("Добавлено в список");
+    notify(t("Добавлено в список"));
   }
 
   function deleteProduct() {
     if (!currentList || sheet?.kind !== "product" || !sheet.itemId) return;
     const { itemId } = sheet;
     const listId = currentList.id;
-    undoable("Продукт удалён", (previous) => ({
+    undoable(t("Продукт удалён"), (previous) => ({
       ...previous,
       lists: previous.lists.map((list) => (list.id === listId ? { ...list, items: list.items.map((item) => (item.id === itemId ? { ...item, deleted: true, updatedAt: Date.now() } : item)) } : list)),
     }));
@@ -389,7 +396,7 @@ export function useShoppingApp() {
   function clearPurchased() {
     if (!currentList) return;
     const listId = currentList.id;
-    undoable("Купленные продукты очищены", (previous) => ({
+    undoable(t("Купленные продукты очищены"), (previous) => ({
       ...previous,
       lists: previous.lists.map((list) => (list.id === listId ? { ...list, items: list.items.map((item) => (item.purchased && !item.deleted ? { ...item, deleted: true, updatedAt: Date.now() } : item)) } : list)),
     }));
@@ -412,7 +419,7 @@ export function useShoppingApp() {
           })
         : list.items,
     }));
-    notify(manual ? "Перетаскивайте продукты за ручку слева" : "Продукты сгруппированы по категориям");
+    notify(manual ? t("Перетаскивайте продукты за ручку слева") : t("Продукты сгруппированы по категориям"));
   }
 
   function reorder(shown: ShoppingItem[], from: number, to: number) {
@@ -436,7 +443,7 @@ export function useShoppingApp() {
     } else {
       addList(addProducts(newList(name), products));
     }
-    notify("Продукты добавлены в список");
+    notify(t("Продукты добавлены в список"));
   }
 
   function addToSomeList(title: string, products: Product[]) {
@@ -473,7 +480,7 @@ export function useShoppingApp() {
       updatedAt: Date.now(),
     });
     closeSheet();
-    notify("Рецепт сохранён");
+    notify(t("Рецепт сохранён"));
   }
 
   // Steps in the recipe form. Until the minutes of a step are typed by hand, they follow the
@@ -512,7 +519,7 @@ export function useShoppingApp() {
       await savePhoto(id, await shrinkPhoto(file));
       setRecipeForm((previous) => ({ ...previous, photo: id }));
     } catch {
-      setFormError("Не удалось открыть фото. Попробуйте другое.");
+      setFormError(t("Не удалось открыть фото. Попробуйте другое."));
     } finally {
       setBusy(false);
     }
@@ -562,7 +569,7 @@ export function useShoppingApp() {
     saveEntity("stores", { id, name: storeForm.name.trim(), categoryOrder: storeForm.order, updatedAt: Date.now() });
     if (sheet.forListId) patchList(sheet.forListId, { storeId: id });
     closeSheet();
-    notify("Магазин сохранён");
+    notify(t("Магазин сохранён"));
   }
 
   function openCategories() {
@@ -575,7 +582,7 @@ export function useShoppingApp() {
     const name = categoryName.trim();
     if (!name) return;
     if (categories.some((entry) => entry.toLocaleLowerCase("ru") === name.toLocaleLowerCase("ru"))) {
-      setFormError("Такая категория уже есть.");
+      setFormError(t("Такая категория уже есть."));
       return;
     }
     saveEntity("categories", { id: createId(), name, updatedAt: Date.now() });
@@ -585,17 +592,17 @@ export function useShoppingApp() {
 
   function setReminder(listId: string, time: number | undefined) {
     if (time !== undefined && !(time > Date.now())) {
-      setFormError("Выберите время в будущем.");
+      setFormError(t("Выберите время в будущем."));
       return;
     }
     patchList(listId, { remindAt: time });
     closeSheet();
     if (time === undefined) {
-      notify("Напоминание убрано");
+      notify(t("Напоминание убрано"));
       return;
     }
     allowReminders().then((allowed) =>
-      notify(allowed ? `Напомним ${formatReminder(time)}` : "Напоминание сохранено, но уведомления запрещены — разрешите их в настройках"),
+      notify(allowed ? t("Напомним {when}", { when: formatReminder(time) }) : t("Напоминание сохранено, но уведомления запрещены — разрешите их в настройках")),
     );
   }
 
@@ -630,19 +637,19 @@ export function useShoppingApp() {
     const { email, password, code } = credentials;
     switch (sheet.step) {
       case "login":
-        return void run(() => cloud.account.signIn("login", email, password), () => { closeSheet(); notify("Вы вошли в аккаунт"); });
+        return void run(() => cloud.account.signIn("login", email, password), () => { closeSheet(); notify(t("Вы вошли в аккаунт")); });
       case "register":
         return void run(() => cloud.account.signIn("register", email, password), () => {
           if (cloud.config.email) openAccount("verify");
           else closeSheet();
-          notify("Аккаунт создан");
+          notify(t("Аккаунт создан"));
         });
       case "verify":
-        return void run(() => cloud.account.verifyEmail(code), () => { closeSheet(); notify("Почта подтверждена"); });
+        return void run(() => cloud.account.verifyEmail(code), () => { closeSheet(); notify(t("Почта подтверждена")); });
       case "forgot":
-        return void run(() => cloud.account.forgotPassword(email), () => { openAccount("reset"); notify("Если такой аккаунт есть, код уже в почте"); });
+        return void run(() => cloud.account.forgotPassword(email), () => { openAccount("reset"); notify(t("Если такой аккаунт есть, код уже в почте")); });
       case "reset":
-        return void run(() => cloud.account.resetPassword(email, code, password), () => { closeSheet(); notify("Пароль изменён, вы вошли в аккаунт"); });
+        return void run(() => cloud.account.resetPassword(email, code, password), () => { closeSheet(); notify(t("Пароль изменён, вы вошли в аккаунт")); });
     }
   }
 
@@ -658,12 +665,18 @@ export function useShoppingApp() {
 
   function startVerification() {
     openAccount("verify");
-    void cloud.account.resendVerification().then(() => notify("Код отправлен на почту"), (error) => setFormError(errorText(error)));
+    void cloud.account.resendVerification().then(() => notify(t("Код отправлен на почту")), (error) => setFormError(errorText(error)));
   }
 
   function signOut() {
     cloud.account.signOut();
-    notify("Вы вышли из аккаунта");
+    notify(t("Вы вышли из аккаунта"));
+  }
+
+  function changeLanguage(next: Language) {
+    setLanguage(next);
+    setLang(next);
+    closeSheet();
   }
 
   // --- Family ------------------------------------------------------------------------------------
@@ -674,18 +687,18 @@ export function useShoppingApp() {
   }
 
   function joinFamily(token: string) {
-    void run(() => cloud.familyActions.join(token), () => { closeSheet(); setTab("lists"); notify("Вы в семье — списки теперь общие"); });
+    void run(() => cloud.familyActions.join(token), () => { closeSheet(); setTab("lists"); notify(t("Вы в семье — списки теперь общие")); });
   }
 
   function leaveFamily() {
-    void run(() => cloud.familyActions.leave(), () => { closeSheet(); notify("Вы вышли из семьи"); });
+    void run(() => cloud.familyActions.leave(), () => { closeSheet(); notify(t("Вы вышли из семьи")); });
   }
 
   // A personal list is seen only by its own members; any other list by the whole family.
   function togglePersonal(list: ShoppingList) {
     const personal = !list.personal;
     patchList(list.id, { personal });
-    notify(personal ? "Список стал личным — семья его не видит" : "Список снова виден всей семье");
+    notify(personal ? t("Список стал личным — семья его не видит") : t("Список снова виден всей семье"));
   }
 
   function openShare(list: ShoppingList) {
@@ -726,6 +739,7 @@ export function useShoppingApp() {
     openRecipe, saveRecipe, editStep, addStep, removeStep, moveStep, pickRecipePhoto, removeRecipePhoto,
     startCooking, goToStep, stopCooking, startStepTimer, allowExactAlarms,
     openStore, saveStore, openCategories, addCategory, setReminder,
+    lang, changeLanguage,
     openFamily, joinFamily, leaveFamily, togglePersonal,
     openAccount, run, submitAccount, openPasswordSheet, openDeleteAccount, startVerification, signOut, openShare,
   };

@@ -431,3 +431,18 @@ test("a list made personal leaves the family's devices", { skip }, async () => {
   assert.deepEqual(kidView.body.revoked, ["P1"]);
   assert.deepEqual(kidView.body.lists, []);
 });
+
+test("the server answers in the app's language", { skip }, async () => {
+  const ask = (lang) =>
+    api.auth(new Request("https://korzina.example/api", { method: "POST", headers: { "x-real-ip": `198.51.100.${address}`, ...(lang ? { "x-lang": lang } : {}) }, body: JSON.stringify({ action: "register", email: "bad", password: "long-enough" }) })).then((response) => response.json());
+  assert.equal((await ask("en")).error, "Enter a valid email address.");
+  assert.equal((await ask("ro")).error, "Introduceți o adresă de e-mail validă.");
+  assert.equal((await ask()).error, "Укажите корректный адрес почты.");
+
+  // Placeholders are filled in every language.
+  await register("lang@example.com", "right-password");
+  for (let attempt = 0; attempt < 5; attempt += 1) await auth({ action: "login", email: "lang@example.com", password: `wrong-${attempt}-xx` });
+  const blocked = await api.auth(new Request("https://korzina.example/api", { method: "POST", headers: { "x-real-ip": "203.0.113.9", "x-lang": "en" }, body: JSON.stringify({ action: "login", email: "lang@example.com", password: "right-password" }) }));
+  assert.equal(blocked.status, 429);
+  assert.match((await blocked.json()).error, /^Too many attempts\. Try again in \d+ min\.$/);
+});

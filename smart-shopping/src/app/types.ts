@@ -1,5 +1,6 @@
 // Screen state of the app and small helpers shared by its parts.
-import type { Product, ShoppingData } from "../model";
+import { units, type Product, type ShoppingData } from "../model";
+import { t } from "../i18n";
 
 export type Tab = "lists" | "favorites" | "recipes" | "history" | "settings";
 export type AccountStep = "login" | "register" | "verify" | "forgot" | "reset";
@@ -18,6 +19,7 @@ export type Sheet =
   | { kind: "password" }
   | { kind: "delete-account" }
   | { kind: "family" }
+  | { kind: "language" }
   | { kind: "family-join"; token: string };
 export type SheetOf<K extends Sheet["kind"]> = Extract<Sheet, { kind: K }>;
 export type Toast = { text: string; undo?: ShoppingData };
@@ -25,8 +27,8 @@ export type Toast = { text: string; undo?: ShoppingData };
 export type StepForm = { id: string; text: string; minutes: string; auto: boolean };
 export type RecipeForm = { name: string; ingredients: string; photo?: string; steps: StepForm[] };
 
-export const blankProduct = (): Product => ({ name: "", quantity: "1", unit: "шт.", category: "", note: "" });
-export const errorText = (error: unknown) => (error instanceof Error ? error.message : "Что-то пошло не так. Попробуйте ещё раз.");
+export const blankProduct = (): Product => ({ name: "", quantity: "1", unit: units[0], category: "", note: "" });
+export const errorText = (error: unknown) => (error instanceof Error ? error.message : t("Что-то пошло не так. Попробуйте ещё раз."));
 
 export function toLocalInput(time: number) {
   return new Date(time - new Date(time).getTimezoneOffset() * 60_000).toISOString().slice(0, 16);

@@ -3,6 +3,7 @@
 // so the other devices of the account see it too. A recipe refers to its photo by id only.
 import { useEffect, useState } from "react";
 import { API_ORIGIN } from "./api-origin";
+import { language, t } from "./i18n";
 
 const DB_NAME = "smart-shopping-photos";
 const STORE = "photos";
@@ -46,11 +47,11 @@ export async function shrinkPhoto(file: Blob): Promise<Blob> {
   canvas.width = Math.round(image.width * scale);
   canvas.height = Math.round(image.height * scale);
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Не удалось обработать фото");
+  if (!context) throw new Error(t("Не удалось обработать фото"));
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   if ("close" in image && typeof image.close === "function") image.close();
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", QUALITY));
-  if (!blob) throw new Error("Не удалось обработать фото");
+  if (!blob) throw new Error(t("Не удалось обработать фото"));
   return blob;
 }
 
@@ -115,7 +116,7 @@ export async function uploadPendingPhotos(token: string) {
   for (const photo of pending) {
     const response = await fetch(remotePhotoUrl(photo.id), {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": photo.blob.type || "image/jpeg" },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": photo.blob.type || "image/jpeg", "X-Lang": language() },
       body: photo.blob,
     }).catch(() => null);
     if (!response) return;

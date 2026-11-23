@@ -7,6 +7,7 @@ import { formatMinutes, stepsOf, type Recipe } from "../model";
 import { formatCountdown } from "./useTimers";
 import { RecipePhoto } from "./ui";
 import type { ShoppingApp } from "./useShoppingApp";
+import { t } from "../i18n";
 
 export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; recipe: Recipe; stepIndex: number }) {
   const { timers } = app;
@@ -19,7 +20,7 @@ export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; re
   const finish = () => {
     timers.stopRecipe(recipe.id);
     app.stopCooking();
-    app.notify("Приятного аппетита!");
+    app.notify(t("Приятного аппетита!"));
   };
 
   return (
@@ -27,9 +28,9 @@ export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; re
       <MobileScroll className="app-screen">
         <main className="cooking-screen screen-content">
           <div className="list-heading-row">
-            <button className="back-button" aria-label="Выйти из режима готовки" onClick={app.stopCooking}><ArrowLeftIcon /></button>
+            <button className="back-button" aria-label={t("Выйти из режима готовки")} onClick={app.stopCooking}><ArrowLeftIcon /></button>
             <div className="list-heading-copy">
-              <p className="eyebrow">ГОТОВИМ{steps.length ? ` · ШАГ ${index + 1} ИЗ ${steps.length}` : ""}</p>
+              <p className="eyebrow">{steps.length ? t("ГОТОВИМ · ШАГ {step} ИЗ {total}", { step: index + 1, total: steps.length }) : t("ГОТОВИМ")}</p>
               <h1>{recipe.name}</h1>
             </div>
           </div>
@@ -38,7 +39,7 @@ export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; re
           {!app.exactAlarms && (
             <button className="setting-row cooking-warning" onClick={() => void app.allowExactAlarms()}>
               <span className="setting-icon setting-warning"><BellIcon /></span>
-              <span><b>Таймер может опоздать</b><small>Разрешите «Будильники и напоминания», чтобы сигнал звучал точно вовремя</small></span>
+              <span><b>{t("Таймер может опоздать")}</b><small>{t("Разрешите «Будильники и напоминания», чтобы сигнал звучал точно вовремя")}</small></span>
               <ChevronRightIcon />
             </button>
           )}
@@ -50,29 +51,29 @@ export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; re
               {step.minutes ? (
                 timer ? (
                   <div className={`cooking-timer ${timer.rang ? "cooking-timer-done" : ""}`}>
-                    <strong>{timer.rang ? "Готово!" : formatCountdown(timer.endsAt - timers.now)}</strong>
+                    <strong>{timer.rang ? t("Готово!") : formatCountdown(timer.endsAt - timers.now)}</strong>
                     <div className="cooking-timer-actions">
-                      <button type="button" className="chip-button" onClick={() => timers.addMinute(timer.id)}><PlusIcon /> 1 мин</button>
-                      <button type="button" className="chip-button" onClick={() => timers.stop(timer.id)}><StopIcon /> {timer.rang ? "Убрать" : "Стоп"}</button>
+                      <button type="button" className="chip-button" onClick={() => timers.addMinute(timer.id)}><PlusIcon /> {t("1 мин")}</button>
+                      <button type="button" className="chip-button" onClick={() => timers.stop(timer.id)}><StopIcon /> {timer.rang ? t("Убрать") : t("Стоп")}</button>
                     </div>
                   </div>
                 ) : (
-                  <button type="button" className="primary-button cooking-timer-start" onClick={() => void app.startStepTimer(recipe, index)}><TimerIcon /> Запустить таймер · {formatMinutes(step.minutes)}</button>
+                  <button type="button" className="primary-button cooking-timer-start" onClick={() => void app.startStepTimer(recipe, index)}><TimerIcon /> {t("Запустить таймер ·")} {formatMinutes(step.minutes)}</button>
                 )
               ) : null}
             </section>
           ) : (
-            <section className="cooking-step"><p>В рецепте пока нет шагов. Добавьте их в карточке рецепта.</p></section>
+            <section className="cooking-step"><p>{t("В рецепте пока нет шагов. Добавьте их в карточке рецепта.")}</p></section>
           )}
 
           {others.length > 0 && (
             <section className="sheet-section">
-              <p className="settings-label">ИДУТ ТАЙМЕРЫ</p>
+              <p className="settings-label">{t("ИДУТ ТАЙМЕРЫ")}</p>
               {others.map((entry) => {
                 const at = steps.findIndex((candidate) => candidate.id === entry.stepId);
                 return (
                   <button key={entry.id} className={`running-timer ${entry.rang ? "running-timer-done" : ""}`} onClick={() => at >= 0 && app.goToStep(at)}>
-                    <TimerIcon /><span>Шаг {at + 1}</span><b>{entry.rang ? "Готово!" : formatCountdown(entry.endsAt - timers.now)}</b>
+                    <TimerIcon /><span>{t("Шаг")} {at + 1}</span><b>{entry.rang ? t("Готово!") : formatCountdown(entry.endsAt - timers.now)}</b>
                   </button>
                 );
               })}
@@ -80,7 +81,7 @@ export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; re
           )}
 
           <section className="sheet-section">
-            <p className="settings-label">ВСЕ ШАГИ</p>
+            <p className="settings-label">{t("ВСЕ ШАГИ")}</p>
             <div className="cooking-steps">
               {steps.map((entry, position) => {
                 const running = timers.forStep(recipe.id, entry.id);
@@ -88,7 +89,7 @@ export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; re
                   <button key={entry.id} className={`cooking-step-row ${position === index ? "cooking-step-current" : ""} ${position < index ? "cooking-step-past" : ""}`} onClick={() => app.goToStep(position)}>
                     <span className="step-number">{position < index ? <CheckIcon /> : position + 1}</span>
                     <span className="cooking-step-text">{entry.text}</span>
-                    {running ? <small className="cooking-step-time">{running.rang ? "готово" : formatCountdown(running.endsAt - timers.now)}</small> : entry.minutes ? <small className="cooking-step-time">{formatMinutes(entry.minutes)}</small> : null}
+                    {running ? <small className="cooking-step-time">{running.rang ? t("готово") : formatCountdown(running.endsAt - timers.now)}</small> : entry.minutes ? <small className="cooking-step-time">{formatMinutes(entry.minutes)}</small> : null}
                   </button>
                 );
               })}
@@ -96,18 +97,18 @@ export function CookingScreen({ app, recipe, stepIndex }: { app: ShoppingApp; re
           </section>
           {recipe.ingredients.length > 0 && (
             <section className="sheet-section">
-              <p className="settings-label">ИНГРЕДИЕНТЫ</p>
-              <p className="cooking-ingredients"><ReaderIcon /> {recipe.ingredients.map((entry) => `${entry.name} ${entry.quantity} ${entry.unit}`.trim()).join(", ")}</p>
+              <p className="settings-label">{t("ИНГРЕДИЕНТЫ")}</p>
+              <p className="cooking-ingredients"><ReaderIcon /> {recipe.ingredients.map((entry) => `${entry.name} ${entry.quantity} ${t(entry.unit)}`.trim()).join(", ")}</p>
             </section>
           )}
           <div className="bottom-spacer" />
         </main>
       </MobileScroll>
-      <nav className="cooking-nav" aria-label="Шаги рецепта">
-        <button className="secondary-button" disabled={index === 0} onClick={() => app.goToStep(index - 1)}><ChevronLeftIcon /> Назад</button>
+      <nav className="cooking-nav" aria-label={t("Шаги рецепта")}>
+        <button className="secondary-button" disabled={index === 0} onClick={() => app.goToStep(index - 1)}><ChevronLeftIcon /> {t("Назад")}</button>
         {last
-          ? <button className="primary-button" onClick={finish}><CheckIcon /> Готово</button>
-          : <button className="primary-button" onClick={() => app.goToStep(index + 1)}>Дальше <ChevronRightIcon /></button>}
+          ? <button className="primary-button" onClick={finish}><CheckIcon /> {t("Готово")}</button>
+          : <button className="primary-button" onClick={() => app.goToStep(index + 1)}>{t("Дальше")} <ChevronRightIcon /></button>}
       </nav>
     </>
   );

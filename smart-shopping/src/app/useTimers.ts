@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cancelTimerAlarm, ringTimer, scheduleTimerAlarm } from "../device";
 import { createId, type Recipe, type RecipeStep } from "../model";
+import { t } from "../i18n";
 
 const STORAGE_KEY = "smart-shopping.timers.v1";
 
@@ -74,7 +75,7 @@ export function useTimers(onRing: (timer: CookingTimer) => void) {
       id: createId(),
       recipeId: recipe.id,
       stepId: step.id,
-      label: `${recipe.name}, шаг ${index + 1}`,
+      label: t("{recipe}, шаг {number}", { recipe: recipe.name, number: index + 1 }),
       endsAt: Date.now() + step.minutes * 60_000,
       minutes: step.minutes,
     };
@@ -82,7 +83,7 @@ export function useTimers(onRing: (timer: CookingTimer) => void) {
     if (previous) void cancelTimerAlarm(previous.id);
     setTimers((current) => [...current.filter((entry) => entry !== previous), timer]);
     setNow(Date.now());
-    return scheduleTimerAlarm({ id: timer.id, title: "Готово: " + timer.label, body: step.text, at: timer.endsAt, recipeId: recipe.id, stepId: step.id });
+    return scheduleTimerAlarm({ id: timer.id, title: t("Готово: ") + timer.label, body: step.text, at: timer.endsAt, recipeId: recipe.id, stepId: step.id });
   }
 
   function addMinute(timerId: string) {
@@ -91,7 +92,7 @@ export function useTimers(onRing: (timer: CookingTimer) => void) {
     const endsAt = Math.max(timer.endsAt, Date.now()) + 60_000;
     setTimers((current) => current.map((entry) => (entry.id === timerId ? { ...entry, endsAt, rang: false } : entry)));
     setNow(Date.now());
-    void scheduleTimerAlarm({ id: timer.id, title: "Готово: " + timer.label, body: "Ещё минута прошла", at: endsAt, recipeId: timer.recipeId, stepId: timer.stepId });
+    void scheduleTimerAlarm({ id: timer.id, title: t("Готово: ") + timer.label, body: t("Ещё минута прошла"), at: endsAt, recipeId: timer.recipeId, stepId: timer.stepId });
   }
 
   function stop(timerId: string) {

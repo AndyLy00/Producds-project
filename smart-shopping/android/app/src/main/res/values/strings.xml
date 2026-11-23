@@ -1,9 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
+<!-- English is the fallback for every device language without its own folder (values-ru, values-ro). -->
 <resources>
-    <string name="app_name">Корзина</string>
-    <string name="title_activity_main">Корзина</string>
+    <string name="app_name">Korzina</string>
+    <string name="title_activity_main">Korzina</string>
     <string name="package_name">io.github.andyly00.korzina</string>
     <string name="custom_url_scheme">io.github.andyly00.korzina</string>
-    <string name="widget_description">Что осталось купить в первом списке</string>
-    <string name="widget_empty">Откройте приложение, чтобы показать список</string>
+    <string name="widget_description">What is left to buy in the first list</string>
+    <string name="widget_empty">Open the app to show a list</string>
 </resources>

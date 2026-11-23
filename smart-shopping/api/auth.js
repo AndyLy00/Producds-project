@@ -28,6 +28,7 @@ import {
   takeAttempt,
   useCode,
 } from "./_lib.js";
+import { languageOf, tr } from "./_i18n.js";
 import { leaveFamily } from "./_family.js";
 
 const MINUTE = 60;
@@ -35,10 +36,10 @@ const HOUR = 60 * MINUTE;
 
 const users = async () => (await database()).collection("users");
 
-async function sendVerificationQuietly(user) {
+async function sendVerificationQuietly(user, lang) {
   if (!emailEnabled()) return;
   try {
-    await sendVerificationCode(user);
+    await sendVerificationCode(user, lang);
   } catch (error) {
     // The account still works; the user can ask for the code again from Settings.
     console.error(error);
@@ -94,7 +95,7 @@ const actions = {
       if (error?.code === 11000) throw new HttpError(409, "Аккаунт с такой почтой уже есть. Войдите в него.");
       throw error;
     }
-    await sendVerificationQuietly(user);
+    await sendVerificationQuietly(user, languageOf(request));
     return json(201, account(user));
   },
 
@@ -124,7 +125,7 @@ const actions = {
     const user = await authenticate(request);
     if (user.emailVerified) return json(200, { ok: true });
     await takeAttempt(`verify:${user._id}`, 5, HOUR);
-    await sendVerificationCode(user);
+    await sendVerificationCode(user, languageOf(request));
     return json(200, { ok: true });
   },
 
@@ -139,8 +140,8 @@ const actions = {
       const code = await issueCode("reset", user._id);
       await sendEmail(
         email,
-        `Код для сброса пароля: ${code}`,
-        `Здравствуйте!\n\nКто-то запросил сброс пароля для аккаунта «Корзины» с этой почтой. Код: ${code}\n\nКод действует 15 минут. Если это были не вы, просто проигнорируйте письмо — пароль останется прежним.`,
+        tr(languageOf(request), "Код для сброса пароля: {code}", { code }),
+        tr(languageOf(request), "Здравствуйте!\n\nКто-то запросил сброс пароля для аккаунта «Корзины» с этой почтой. Код: {code}\n\nКод действует {minutes} минут. Если это были не вы, просто проигнорируйте письмо — пароль останется прежним.", { code, minutes: 15 }),
       );
     }
     return json(200, { ok: true });

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Политика конфиденциальности — Корзина</title>
-  <meta name="description" content="Какие данные хранит приложение «Корзина», где и как их удалить.">
+  <title>Privacy policy — Korzina</title>
+  <meta name="description" content="What data the Korzina app keeps, where, and how to delete it. Russian, English, Romanian.">
   <style>
     :root {
       --paper: #faf7ee;
@@ -31,12 +31,27 @@
     li { margin: 4px 0; }
     .card { margin: 20px 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
     a { color: var(--green); }
+    .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .langs { display: flex; gap: 4px; }
+    .langs a { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 14px; text-decoration: none; }
+    .langs a[aria-current="true"] { border-color: var(--green); color: var(--green); font-weight: 700; }
+    article { display: none; }
+    article.shown { display: block; }
     footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
   </style>
 </head>
 <body>
   <main>
-    <a class="brand" href="/"><span aria-hidden="true">К</span>Корзина</a>
+    <header class="top">
+      <a class="brand" href="/"><span aria-hidden="true">K</span><b data-ru="Корзина">Korzina</b></a>
+      <nav class="langs" aria-label="Language">
+        <a href="?lang=ru" data-lang="ru" lang="ru">Русский</a>
+        <a href="?lang=en" data-lang="en" lang="en">English</a>
+        <a href="?lang=ro" data-lang="ro" lang="ro">Română</a>
+      </nav>
+    </header>
+
+    <article lang="ru">
     <h1>Политика конфиденциальности</h1>
     <p class="updated">Действует с 23 ноября 2026 года</p>
 
@@ -74,6 +89,102 @@
     <p>Если политика изменится, новая версия появится на этой странице с новой датой. Вопросы можно задать через <a href="https://github.com/AndyLy00/Producds-project/issues" rel="noopener">страницу проекта на GitHub</a>.</p>
 
     <footer><a href="/">Открыть «Корзину»</a></footer>
+    </article>
+
+    <article lang="en">
+    <h1>Privacy policy</h1>
+    <p class="updated">Effective from 23 November 2026</p>
+
+    <div class="card">
+      In short: Korzina keeps only what it needs for shopping lists and recipes. We show no ads, do not sell or share your data for advertising, and do not track you with analytics. You can delete your account and everything linked to it at any time, right in the app.
+    </div>
+
+    <h2>Without an account</h2>
+    <p>If you do not sign in, your lists, recipes, photos and settings are stored only on your device and are not sent anywhere.</p>
+
+    <h2>What is stored when you sign in</h2>
+    <ul>
+      <li><b>Email address</b> — so you can sign in and recover access.</li>
+      <li><b>Password</b> — only as an irreversible hash (scrypt); we never know the password itself.</li>
+      <li><b>Sign-in with Google</b> — Google tells us your email address and Google account ID. We ask Google for nothing else and get no access to your Google account.</li>
+      <li><b>Your data in the app</b>: shopping lists, recipes and their photos, stores, templates, your own categories and the chosen theme — so they are on all your devices.</li>
+      <li><b>Shared lists and family</b>: who takes part in them. Members see each other's email addresses.</li>
+      <li><b>Service records</b>: counters of sign-in attempts (by email address and IP address) to protect against password guessing. They delete themselves after 15–60 minutes.</li>
+    </ul>
+    <p>Cooking timers and reminders are stored only on the device.</p>
+
+    <h2>Where the data is stored</h2>
+    <p>The app's server runs on <a href="https://vercel.com/legal/privacy-policy" rel="noopener">Vercel</a>, and the data is stored in a <a href="https://www.mongodb.com/legal/privacy" rel="noopener">MongoDB Atlas</a> database. When the app sends you an email (a confirmation code, a password reset or an invitation), it goes through <a href="https://resend.com/legal/privacy-policy" rel="noopener">Resend</a>. These services process the data only to run Korzina.</p>
+
+    <h2>Who sees your data</h2>
+    <p>Only you — and the people you choose to share with: members of a shared list see that list, and family members see all your lists except those marked personal. Recipes and photos are visible only to you. Recipe photos are available through a long random link that cannot be guessed.</p>
+
+    <h2>How to delete your data</h2>
+    <p>In the app: <b>Settings → Account → Delete account</b>. Your account, recipes, photos and settings on the server are deleted at once, and you leave your family. Lists only you kept are deleted; shared ones stay with the other members. Data on your device stays until you remove the app.</p>
+
+    <h2>Children</h2>
+    <p>The app is not meant for collecting data from children under 13.</p>
+
+    <h2>Changes and questions</h2>
+    <p>If this policy changes, the new version will appear on this page with a new date. You can ask questions on the <a href="https://github.com/AndyLy00/Producds-project/issues" rel="noopener">project's GitHub page</a>.</p>
+
+    <footer><a href="/">Open Korzina</a></footer>
+    </article>
+
+    <article lang="ro">
+    <h1>Politica de confidențialitate</h1>
+    <p class="updated">În vigoare din 23 noiembrie 2026</p>
+
+    <div class="card">
+      Pe scurt: Korzina păstrează doar ce îi trebuie pentru listele de cumpărături și rețete. Nu afișăm reclame, nu vindem și nu transmitem datele dvs. pentru publicitate și nu vă urmărim cu instrumente de analiză. Puteți șterge oricând contul și tot ce ține de el, direct din aplicație.
+    </div>
+
+    <h2>Fără cont</h2>
+    <p>Dacă nu vă autentificați, listele, rețetele, fotografiile și setările sunt păstrate doar pe dispozitivul dvs. și nu sunt trimise nicăieri.</p>
+
+    <h2>Ce se păstrează dacă vă autentificați</h2>
+    <ul>
+      <li><b>Adresa de e-mail</b> — ca să vă puteți autentifica și recupera accesul.</li>
+      <li><b>Parola</b> — doar sub formă de hash ireversibil (scrypt); parola în sine nu o cunoaștem.</li>
+      <li><b>Autentificarea cu Google</b> — Google ne comunică adresa de e-mail și identificatorul contului Google. Nu cerem nimic altceva de la Google și nu primim acces la contul dvs. Google.</li>
+      <li><b>Datele dvs. din aplicație</b>: listele de cumpărături, rețetele și fotografiile lor, magazinele, șabloanele, categoriile proprii și tema aleasă — ca să fie pe toate dispozitivele dvs.</li>
+      <li><b>Listele comune și familia</b>: cine participă la ele. Membrii își văd unii altora adresele de e-mail.</li>
+      <li><b>Înregistrări tehnice</b>: contoare ale încercărilor de autentificare (după adresa de e-mail și adresa IP), pentru protecție împotriva ghicirii parolei. Se șterg singure după 15–60 de minute.</li>
+    </ul>
+    <p>Cronometrele de gătit și mementourile sunt păstrate doar pe dispozitiv.</p>
+
+    <h2>Unde sunt păstrate datele</h2>
+    <p>Serverul aplicației rulează pe platforma <a href="https://vercel.com/legal/privacy-policy" rel="noopener">Vercel</a>, iar datele sunt păstrate în baza de date <a href="https://www.mongodb.com/legal/privacy" rel="noopener">MongoDB Atlas</a>. Când aplicația vă trimite un e-mail (cod de confirmare, resetarea parolei sau o invitație), acesta pleacă prin serviciul <a href="https://resend.com/legal/privacy-policy" rel="noopener">Resend</a>. Aceste servicii prelucrează datele doar pentru funcționarea Korzina.</p>
+
+    <h2>Cine vă vede datele</h2>
+    <p>Doar dvs. — și persoanele cu care alegeți să le împărțiți: membrii unei liste comune văd acea listă, iar membrii familiei văd toate listele dvs., cu excepția celor marcate ca personale. Rețetele și fotografiile le vedeți doar dvs. Fotografiile rețetelor sunt accesibile printr-un link lung și aleatoriu, care nu poate fi ghicit.</p>
+
+    <h2>Cum vă ștergeți datele</h2>
+    <p>În aplicație: <b>Setări → Cont → Ștergeți contul</b>. Contul, rețetele, fotografiile și setările de pe server se șterg imediat, iar dvs. ieșiți din familie. Listele ținute doar de dvs. se șterg; cele comune rămân la ceilalți membri. Datele de pe dispozitiv rămân până când ștergeți aplicația.</p>
+
+    <h2>Copii</h2>
+    <p>Aplicația nu este destinată colectării datelor copiilor sub 13 ani.</p>
+
+    <h2>Modificări și întrebări</h2>
+    <p>Dacă politica se schimbă, noua versiune va apărea pe această pagină, cu o dată nouă. Întrebările le puteți pune pe <a href="https://github.com/AndyLy00/Producds-project/issues" rel="noopener">pagina proiectului pe GitHub</a>.</p>
+
+    <footer><a href="/">Deschideți Korzina</a></footer>
+    </article>
   </main>
+  <script>
+    // Language: ?lang=…, otherwise the browser's; Russian, English or Romanian.
+    (function () {
+      var wanted = new URLSearchParams(location.search).get("lang");
+      var browser = (navigator.languages || [navigator.language || ""]).map(function (tag) { return tag.toLowerCase().split("-")[0]; });
+      var lang = ["ru", "en", "ro"].indexOf(wanted) >= 0 ? wanted
+        : browser.find(function (tag) { return ["ru", "be", "uk", "kk", "ro", "mo", "en"].indexOf(tag) >= 0; }) || "en";
+      lang = { be: "ru", uk: "ru", kk: "ru", mo: "ro" }[lang] || lang;
+      document.documentElement.lang = lang;
+      document.querySelector('article[lang="' + lang + '"]').classList.add("shown");
+      document.querySelectorAll(".langs a").forEach(function (link) { if (link.dataset.lang === lang) link.setAttribute("aria-current", "true"); });
+      document.title = { ru: "Политика конфиденциальности — Корзина", en: "Privacy policy — Korzina", ro: "Politica de confidențialitate — Korzina" }[lang];
+      if (lang === "ru") document.querySelector(".brand b").textContent = "Корзина";
+    })();
+  </script>
 </body>
 </html>

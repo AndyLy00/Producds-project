@@ -5,9 +5,21 @@
 // removal reaches the other copies. Copies are merged per entity (shared/merge.js), which is why
 // every change below stamps exactly the entities it touches.
 import { mergeLists, mergeProfile, pruneList, pruneProfile } from "../shared/merge.js";
+import { locale, t } from "./i18n.ts";
 
 export const defaultCategories = ["Овощи и фрукты", "Мясо и рыба", "Молочные продукты", "Бакалея", "Напитки", "Для дома", "Сладости и снеки"];
+// Stored as written here whatever the language (src/i18n.ts); t() translates them for display.
 export const units = ["шт.", "кг", "г", "л", "мл", "уп."];
+
+// Units as people type them in any of the app's languages.
+const unitAliases: Record<string, string> = {
+  "шт": "шт.", "pcs": "шт.", "pc": "шт.", "buc": "шт.",
+  "кг": "кг", "kg": "кг",
+  "г": "г", "g": "г",
+  "л": "л", "l": "л",
+  "мл": "мл", "ml": "мл",
+  "уп": "уп.", "pack": "уп.", "pkg": "уп.", "pachet": "уп.", "pac": "уп.",
+};
 
 export type Product = { name: string; quantity: string; unit: string; category: string; note: string };
 
@@ -89,15 +101,17 @@ export function pruneData(data: ShoppingData, now = Date.now()): ShoppingData {
   return { ...data, ...pruneProfile(profileOf(data), now), lists: data.lists.map((list) => pruneList(list, now)) };
 }
 
+// The default category a product most likely belongs to, from words in its name in Russian,
+// English or Romanian.
 export function guessCategory(name: string) {
-  const value = name.toLocaleLowerCase("ru");
+  const value = ` ${name.toLocaleLowerCase()} `;
   const [vegetables, meat, dairy, grocery, drinks, home, sweets] = defaultCategories;
-  if (/яблок|помидор|томат|лук|огур|картоф|морков|зелень|капуст|банан|апельс|перец|лимон|груш|чеснок|укроп|петруш/.test(value)) return vegetables;
-  if (/кур|мяс|говяд|свин|рыб|фарш|колбас|сосиск|филе|индейк/.test(value)) return meat;
-  if (/молок|сыр|яйц|сметан|йогурт|кефир|творог|масло слив|сливк/.test(value)) return dairy;
-  if (/вода|сок|чай|кофе|напит|лимонад/.test(value)) return drinks;
-  if (/шоколад|печень|снек|конфет|чипс|слад/.test(value)) return sweets;
-  if (/моющ|губк|пакет|бумаг|средств|мыло|шампун/.test(value)) return home;
+  if (/яблок|помидор|томат|лук|огур|картоф|морков|зелень|капуст|банан|апельс|перец|лимон|груш|чеснок|укроп|петруш|apple|tomato|onion|cucumber|potato|carrot|cabbage|banana|orange|pepper|lemon|pear|garlic|dill|parsley|lettuce|eggplant|fruit|vegetable|berr|mere|măr|roșii|rosii|ceap|castrave|cartof|morcov|varz|portocal|ardei|lămâ|lamai|usturo|mărar|marar|pătrunjel|patrunjel|salat|vinete|fruct|legum/.test(value)) return vegetables;
+  if (/кур|мяс|говяд|свин|рыб|фарш|колбас|сосиск|филе|индейк|chicken|meat|beef|pork|fish|mince|sausage|ham |fillet|turkey|salmon|tuna|pui|carne|vită|vita|porc|pește|peste|tocat|cârna|carna|crenvur|curcan|somon|șunc|sunc/.test(value)) return meat;
+  if (/молок|сыр|яйц|сметан|йогурт|кефир|творог|масло слив|сливк|milk|cheese|egg|sour cream|yogh?urt|kefir|cottage|butter|lapte|brânz|branz| ou | ouă | oua |smântân|smantan|iaurt|chefir| unt |frișc|frisc/.test(value)) return dairy;
+  if (/вода|сок|чай|кофе|напит|лимонад|water|juice| tea|coffee|drink|soda|lemonade| apă | apa | suc|ceai|cafea|băutur|bautur|limonad/.test(value)) return drinks;
+  if (/шоколад|печень|снек|конфет|чипс|слад|chocolate|cookie|biscuit|snack|candy|sweet|chips|cake|ciocolat|bomboan|dulc|prăjitur|prajitur/.test(value)) return sweets;
+  if (/моющ|губк|пакет|бумаг|средств|мыло|шампун|detergent|sponge| bag|paper|soap|shampoo|towel|cleaner|burete|pung|hârtie|hartie|săpun|sapun|șampon|sampon|prosop/.test(value)) return home;
   return grocery;
 }
 
@@ -115,15 +129,31 @@ export function categoryOrderFor(list: ShoppingList, data: ShoppingData) {
 }
 
 export function sortItems(items: ShoppingItem[], list: ShoppingList, data: ShoppingData) {
-  if (list.sortMode === "manual") return [...items].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "ru"));
+  if (list.sortMode === "manual") return [...items].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, locale()));
   const rank = new Map(categoryOrderFor(list, data).map((category, index) => [category, index]));
-  return [...items].sort((a, b) => (rank.get(a.category) ?? 99) - (rank.get(b.category) ?? 99) || a.name.localeCompare(b.name, "ru"));
+  return [...items].sort((a, b) => (rank.get(a.category) ?? 99) - (rank.get(b.category) ?? 99) || a.name.localeCompare(b.name, locale()));
 }
 
 export function progress(list: ShoppingList) {
   const items = alive(list.items);
   const bought = items.filter((item) => item.purchased).length;
   return { bought, total: items.length, left: items.length - bought, percent: items.length ? (bought / items.length) * 100 : 0 };
+}
+
+const productImages: Record<string, string> = {
+  "молоко": "milk", "milk": "milk", "lapte": "milk",
+  "хлеб": "bread", "bread": "bread", "pâine": "bread", "paine": "bread",
+  "яблоки": "apples", "apples": "apples", "mere": "apples",
+  "яйца": "eggs", "eggs": "eggs", "ouă": "eggs", "oua": "eggs",
+  "помидоры": "tomatoes", "tomatoes": "tomatoes", "roșii": "tomatoes", "rosii": "tomatoes",
+  "сыр": "cheese", "cheese": "cheese", "brânză": "cheese", "branza": "cheese",
+  "кофе": "coffee", "coffee": "coffee", "cafea": "coffee",
+};
+
+// A picture for a common product, when there is one.
+export function productImage(name: string) {
+  const image = productImages[name.trim().toLocaleLowerCase()];
+  return image ? `/assets/app/items/${image}.png` : undefined;
 }
 
 export function newItem(product: Product, order: number, now = Date.now()): ShoppingItem {
@@ -212,43 +242,43 @@ export function seedData(): ShoppingData {
   return {
     ...emptyData(),
     lists: [
-      seedList("weekly-shop", "Покупки на неделю", 0, [
-        ["Молоко", "1", "л", "Молочные продукты", true, true],
-        ["Хлеб", "1", "шт.", "Бакалея", true, true],
-        ["Яблоки", "1", "кг", "Овощи и фрукты", false, true],
-        ["Яйца", "10", "шт.", "Молочные продукты"],
-        ["Помидоры", "500", "г", "Овощи и фрукты"],
-        ["Сыр", "200", "г", "Молочные продукты"],
-        ["Кофе", "1", "уп.", "Бакалея"],
+      seedList("weekly-shop", t("Покупки на неделю"), 0, [
+        [t("Молоко"), "1", "л", "Молочные продукты", true, true],
+        [t("Хлеб"), "1", "шт.", "Бакалея", true, true],
+        [t("Яблоки"), "1", "кг", "Овощи и фрукты", false, true],
+        [t("Яйца"), "10", "шт.", "Молочные продукты"],
+        [t("Помидоры"), "500", "г", "Овощи и фрукты"],
+        [t("Сыр"), "200", "г", "Молочные продукты"],
+        [t("Кофе"), "1", "уп.", "Бакалея"],
       ]),
-      seedList("home-shop", "Покупки для дома", 1, [
-        ["Губки для посуды", "1", "уп.", "Для дома", true],
-        ["Бумажные полотенца", "2", "уп.", "Для дома"],
-        ["Жидкое мыло", "1", "шт.", "Для дома"],
-        ["Пакеты для мусора", "1", "уп.", "Для дома"],
+      seedList("home-shop", t("Покупки для дома"), 1, [
+        [t("Губки для посуды"), "1", "уп.", "Для дома", true],
+        [t("Бумажные полотенца"), "2", "уп.", "Для дома"],
+        [t("Жидкое мыло"), "1", "шт.", "Для дома"],
+        [t("Пакеты для мусора"), "1", "уп.", "Для дома"],
       ]),
-      seedList("weekend-shop", "Выходные", 2, [
-        ["Куриное филе", "1", "кг", "Мясо и рыба"],
-        ["Картофель", "2", "кг", "Овощи и фрукты"],
-        ["Сметана", "1", "шт.", "Молочные продукты"],
+      seedList("weekend-shop", t("Выходные"), 2, [
+        [t("Куриное филе"), "1", "кг", "Мясо и рыба"],
+        [t("Картофель"), "2", "кг", "Овощи и фрукты"],
+        [t("Сметана"), "1", "шт.", "Молочные продукты"],
       ]),
     ],
     recipes: [
       {
         id: "recipe-syrniki",
-        name: "Сырники",
-        note: "1. Смешать творог, яйцо, муку и сахар.\n2. Дать тесту постоять 10 минут.\n3. Обжарить с каждой стороны по 3 минуты на среднем огне.",
+        name: t("Сырники"),
+        note: "",
         steps: [
-          { id: "recipe-syrniki-1", text: "Смешать творог, яйцо, муку и сахар." },
-          { id: "recipe-syrniki-2", text: "Дать тесту постоять 10 минут.", minutes: 10 },
-          { id: "recipe-syrniki-3", text: "Обжарить с каждой стороны по 3 минуты на среднем огне.", minutes: 6 },
+          { id: "recipe-syrniki-1", text: t("Смешать творог, яйцо, муку и сахар.") },
+          { id: "recipe-syrniki-2", text: t("Дать тесту постоять 10 минут."), minutes: 10 },
+          { id: "recipe-syrniki-3", text: t("Обжарить с каждой стороны по 3 минуты на среднем огне."), minutes: 6 },
         ],
         updatedAt: 1,
         ingredients: [
-          { name: "Творог", quantity: "400", unit: "г", category: "Молочные продукты", note: "" },
-          { name: "Яйца", quantity: "1", unit: "шт.", category: "Молочные продукты", note: "" },
-          { name: "Мука", quantity: "3", unit: "уп.", category: "Бакалея", note: "ст. ложки" },
-          { name: "Сахар", quantity: "2", unit: "уп.", category: "Бакалея", note: "ст. ложки" },
+          { name: t("Творог"), quantity: "400", unit: "г", category: "Молочные продукты", note: "" },
+          { name: t("Яйца"), quantity: "1", unit: "шт.", category: "Молочные продукты", note: "" },
+          { name: t("Мука"), quantity: "3", unit: "уп.", category: "Бакалея", note: t("ст. ложки") },
+          { name: t("Сахар"), quantity: "2", unit: "уп.", category: "Бакалея", note: t("ст. ложки") },
         ],
       },
     ],
@@ -329,13 +359,13 @@ export function restore(before: ShoppingData, current: ShoppingData, now = Date.
 export function listAsText(list: ShoppingList) {
   const items = alive(list.items);
   const left = items.filter((item) => !item.purchased);
-  const lines = (left.length ? left : items).map((item) => `• ${item.name} — ${item.quantity} ${item.unit}${item.note ? ` (${item.note})` : ""}`);
-  return `🛒 ${list.name}\n${lines.join("\n") || "Список пуст"}`;
+  const lines = (left.length ? left : items).map((item) => `• ${item.name} — ${item.quantity} ${t(item.unit)}${item.note ? ` (${item.note})` : ""}`);
+  return `🛒 ${list.name}\n${lines.join("\n") || t("Список пуст")}`;
 }
 
-const ingredientPattern = /^(.*?)(?:[\s,—-]+(\d+(?:[.,]\d+)?)\s*(шт\.?|кг|г|л|мл|уп\.?)?)?$/i;
+const ingredientPattern = /^(.*?)(?:[\s,—-]+(\d+(?:[.,]\d+)?)\s*(шт\.?|кг|г|л|мл|уп\.?|pcs?\.?|kg|g|l|ml|pack|pkg|buc\.?|pachet|pac\.?)?)?$/i;
 
-// One product per line: "Мука 500 г", "Яйца, 3 шт.", "Соль".
+// One product per line: "Мука 500 г", "Яйца, 3 шт.", "Flour 500 g", "Ouă 3 buc.", "Соль".
 export function parseProducts(text: string, categories: string[]): Product[] {
   return text
     .split("\n")
@@ -344,7 +374,7 @@ export function parseProducts(text: string, categories: string[]): Product[] {
     .map((line) => {
       const [, name = line, quantity, unit] = ingredientPattern.exec(line) ?? [];
       const cleanName = (name || line).trim();
-      const normalizedUnit = unit ? (units.find((entry) => entry.replace(".", "") === unit.toLowerCase().replace(".", "")) ?? "шт.") : "шт.";
+      const normalizedUnit = unit ? (unitAliases[unit.toLowerCase().replace(".", "")] ?? "шт.") : "шт.";
       const category = guessCategory(cleanName);
       return { name: cleanName, quantity: quantity?.replace(",", ".") ?? "1", unit: normalizedUnit, category: categories.includes(category) ? category : categories[3], note: "" };
     });
@@ -352,14 +382,15 @@ export function parseProducts(text: string, categories: string[]): Product[] {
 
 // --- Recipe steps ------------------------------------------------------------------------------
 
-const durationPattern = /(\d+(?:[.,]\d+)?)(?:\s*[-–—]\s*(\d+(?:[.,]\d+)?))?\s*(час(?:а|ов)?|ч\.?|мин(?:ут[ауы]?|\.)?)(?![а-яё])/i;
+const durationPattern = /(\d+(?:[.,]\d+)?)(?:\s*[-–—]\s*(\d+(?:[.,]\d+)?))?\s*(час(?:а|ов)?|ч\.?|мин(?:ут[ауы]?|\.)?|hours?|hrs?|h|minutes?|mins?|oră|ore|ora|minute|minut)(?![a-zа-яёăâîșț])/i;
 
-// "Варить 10–12 минут" → 12, "тушить 1,5 часа" → 90; nothing found → undefined.
+// "Варить 10–12 минут" → 12, "тушить 1,5 часа" → 90, "bake for 20 minutes" → 20,
+// "fierbe 1,5 ore" → 90; nothing found → undefined.
 export function guessMinutes(text: string): number | undefined {
   const match = durationPattern.exec(text);
   if (!match) return undefined;
   const value = Number((match[2] ?? match[1]).replace(",", "."));
-  const minutes = Math.round(/^ч/i.test(match[3]) ? value * 60 : value);
+  const minutes = Math.round(/^(ч|h|o)/i.test(match[3]) ? value * 60 : value);
   return minutes > 0 && minutes <= 24 * 60 ? minutes : undefined;
 }
 
@@ -385,11 +416,12 @@ export function totalMinutes(steps: RecipeStep[]) {
 export function formatMinutes(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return hours ? `${hours} ч${rest ? ` ${rest} мин` : ""}` : `${rest} мин`;
+  if (!hours) return t("{minutes} мин", { minutes: rest });
+  return rest ? t("{hours} ч {minutes} мин", { hours, minutes: rest }) : t("{hours} ч", { hours });
 }
 
 export function productsAsText(products: Product[]) {
-  return products.map((product) => `${product.name} ${product.quantity} ${product.unit}`.trim()).join("\n");
+  return products.map((product) => `${product.name} ${product.quantity} ${t(product.unit)}`.trim()).join("\n");
 }
 
 // Products bought before whose name starts with (or contains) the typed text, most frequent first.
@@ -412,7 +444,7 @@ export function suggestions(data: ShoppingData, typed: string, exclude: Shopping
     else seen.set(key, { product: updatedAt >= entry.latest ? toProduct(product) : entry.product, count: entry.count + 1, latest: Math.max(updatedAt, entry.latest) });
   }
   return [...seen.entries()]
-    .sort(([a, x], [b, y]) => Number(b.startsWith(query)) - Number(a.startsWith(query)) || y.count - x.count || a.localeCompare(b, "ru"))
+    .sort(([a, x], [b, y]) => Number(b.startsWith(query)) - Number(a.startsWith(query)) || y.count - x.count || a.localeCompare(b, locale()))
     .slice(0, limit)
     .map(([, entry]) => entry.product);
 }
@@ -421,8 +453,8 @@ export function formatReminder(time: number) {
   const date = new Date(time);
   const today = new Date();
   const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-  const hours = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  if (date.toDateString() === today.toDateString()) return `сегодня, ${hours}`;
-  if (date.toDateString() === tomorrow.toDateString()) return `завтра, ${hours}`;
-  return `${date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" })}, ${hours}`;
+  const time_ = date.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+  if (date.toDateString() === today.toDateString()) return t("сегодня, {time}", { time: time_ });
+  if (date.toDateString() === tomorrow.toDateString()) return t("завтра, {time}", { time: time_ });
+  return `${date.toLocaleDateString(locale(), { weekday: "short", day: "numeric", month: "short" })}, ${time_}`;
 }

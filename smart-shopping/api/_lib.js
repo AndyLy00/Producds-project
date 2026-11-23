@@ -3,6 +3,7 @@
 import { createHash, createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { MongoClient } from "mongodb";
+import { languageOf, tr } from "./_i18n.js";
 
 const scryptAsync = promisify(scrypt);
 const TOKEN_LIFETIME_SECONDS = 180 * 24 * 60 * 60;
@@ -13,7 +14,7 @@ const TOKEN_LIFETIME_SECONDS = 180 * 24 * 60 * 60;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Lang",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -28,10 +29,13 @@ export function preflight() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
+// `message` is the Russian text of api/_i18n.js; {name} placeholders are filled from `params`.
+// The answer is translated into the language the app asked for.
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, params = {}) {
     super(message);
     this.status = status;
+    this.params = params;
   }
 }
 
@@ -41,9 +45,10 @@ export function route(handler) {
     try {
       return await handler(request);
     } catch (error) {
-      if (error instanceof HttpError) return json(error.status, { error: error.message });
+      const lang = languageOf(request);
+      if (error instanceof HttpError) return json(error.status, { error: tr(lang, error.message, error.params) });
       console.error(error);
-      return json(500, { error: "Сервер временно недоступен. Попробуйте позже." });
+      return json(500, { error: tr(lang, "Сервер временно недоступен. Попробуйте позже.") });
     }
   };
 }
@@ -105,7 +110,7 @@ export async function takeAttempt(subject, limit, windowSeconds) {
     .findOneAndUpdate({ _id }, { $inc: { count: 1 }, $setOnInsert: { expiresAt } }, { upsert: true, returnDocument: "after" });
   if ((counter?.count ?? 1) <= limit) return;
   const minutes = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
-  throw new HttpError(429, `Слишком много попыток. Попробуйте снова через ${minutes} мин.`);
+  throw new HttpError(429, "Слишком много попыток. Попробуйте снова через {minutes} мин.", { minutes });
 }
 
 // Takes back an attempt that turned out to be legitimate (a correct password).
@@ -264,12 +269,12 @@ export async function useCode(purpose, userId, code) {
   await codes.deleteOne({ _id: stored._id });
 }
 
-export async function sendVerificationCode(user) {
+export async function sendVerificationCode(user, lang = "ru") {
   const code = await issueCode("verify", user._id);
   await sendEmail(
     user.email,
-    `Код подтверждения: ${code}`,
-    `Здравствуйте!\n\nВаш код для подтверждения почты в приложении «Корзина»: ${code}\n\nКод действует ${CODE_LIFETIME_MINUTES} минут. Если вы не создавали аккаунт, просто проигнорируйте это письмо.`,
+    tr(lang, "Код подтверждения: {code}", { code }),
+    tr(lang, "Здравствуйте!\n\nВаш код для подтверждения почты в приложении «Корзина»: {code}\n\nКод действует {minutes} минут. Если вы не создавали аккаунт, просто проигнорируйте это письмо.", { code, minutes: CODE_LIFETIME_MINUTES }),
   );
 }
 

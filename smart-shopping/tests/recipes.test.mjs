@@ -1,7 +1,11 @@
 // Recipe steps (src/model.ts): timers found in the text, and recipes saved before steps existed.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatMinutes, guessMinutes, stepsAsNote, stepsOf, totalMinutes } from "../src/model.ts";
+import { setLanguage } from "../src/i18n.ts";
+import { formatMinutes, guessCategory, guessMinutes, parseProducts, stepsAsNote, stepsOf, totalMinutes } from "../src/model.ts";
+
+// Node reports its own language; these checks are written in Russian unless they say otherwise.
+setLanguage("ru");
 
 test("a duration in the text of a step becomes its timer", () => {
   assert.equal(guessMinutes("Варить 10 минут"), 10);
@@ -28,4 +32,32 @@ test("steps are kept as text for older app versions, and their time adds up", ()
   assert.equal(totalMinutes(steps), 65);
   assert.equal(formatMinutes(65), "1 ч 5 мин");
   assert.equal(formatMinutes(40), "40 мин");
+});
+
+test("timers, categories and units are understood in English and Romanian too", () => {
+  assert.equal(guessMinutes("Bake for 20 minutes"), 20);
+  assert.equal(guessMinutes("Simmer 1.5 hours"), 90);
+  assert.equal(guessMinutes("Rest 10 min"), 10);
+  assert.equal(guessMinutes("Fierbeți 15 minute"), 15);
+  assert.equal(guessMinutes("Coaceți 1,5 ore"), 90);
+  assert.equal(guessMinutes("Add 2 eggs"), undefined);
+  assert.equal(guessCategory("Milk"), "Молочные продукты");
+  assert.equal(guessCategory("Roșii"), "Овощи и фрукты");
+  assert.equal(guessCategory("Piept de pui"), "Мясо и рыба");
+  assert.equal(guessCategory("Ciocolată"), "Сладости и снеки");
+  const categories = ["Овощи и фрукты", "Мясо и рыба", "Молочные продукты", "Бакалея"];
+  assert.deepEqual(parseProducts(["Flour 500 g", "Ouă 3 buc.", "Sugar 1 pack"].join("\n"), categories).map((product) => [product.name, product.quantity, product.unit]), [
+    ["Flour", "500", "г"],
+    ["Ouă", "3", "шт."],
+    ["Sugar", "1", "уп."],
+  ]);
+});
+
+test("times are shown in the chosen language", () => {
+  setLanguage("en");
+  assert.equal(formatMinutes(65), "1 h 5 min");
+  setLanguage("ro");
+  assert.equal(formatMinutes(40), "40 min");
+  setLanguage("ru");
+  assert.equal(formatMinutes(120), "2 ч");
 });

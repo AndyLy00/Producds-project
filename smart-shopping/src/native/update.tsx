@@ -2,6 +2,7 @@
 // Every push to main is built on GitHub and published as a release tagged build-<number>
 // (.github/workflows/android.yml); the app compares that number with its own.
 import { useEffect, useState } from "react";
+import { t } from "../i18n";
 
 declare const __APP_VERSION_CODE__: number;
 
@@ -23,7 +24,7 @@ async function fetchUpdate(): Promise<Update | null> {
   const code = Number(/^build-(\d+)$/.exec(release.tag_name ?? "")?.[1]);
   if (!Number.isInteger(code) || code <= __APP_VERSION_CODE__) return null;
   const url = release.assets?.find((asset) => asset.name.endsWith(".apk"))?.browser_download_url ?? release.html_url;
-  return url ? { code, name: release.name ?? `сборка ${code}`, url } : null;
+  return url ? { code, name: release.name ?? t("сборка {code}", { code }), url } : null;
 }
 
 function readDismissed() {
@@ -74,14 +75,14 @@ export function UpdateBanner() {
   return (
     <div className="update-banner" role="status">
       <div className="update-banner-text">
-        <strong>Доступно обновление</strong>
+        <strong>{t("Доступно обновление")}</strong>
         <span>{update.name}</span>
       </div>
       {/* Leaving the app's own origin makes Capacitor hand the link to the browser, which downloads the APK. */}
       <button type="button" className="update-banner-action" onClick={() => window.location.assign(update.url)}>
-        Обновить
+        {t("Обновить")}
       </button>
-      <button type="button" className="update-banner-close" aria-label="Скрыть" onClick={dismiss}>
+      <button type="button" className="update-banner-close" aria-label={t("Скрыть")} onClick={dismiss}>
         ×
       </button>
     </div>

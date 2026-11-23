@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { API_ORIGIN } from "./api-origin";
 import { uploadPendingPhotos } from "./photos";
 import { isDemoList, mergeData, profileOf, type ShoppingData, type ShoppingList, type Profile, type Sharing } from "./model";
+import { language, t } from "./i18n";
 
 const SESSION_KEY = "smart-shopping.account.v2";
 const VERIFIER_KEY = "smart-shopping.google-verifier";
@@ -38,14 +39,16 @@ export async function api<T>(path: string, body?: unknown, token?: string): Prom
       headers: {
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // The server answers in the app's language (api/_i18n.js).
+        "X-Lang": language(),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, "Нет связи с сервером. Проверьте интернет.");
+    throw new ApiError(0, t("Нет связи с сервером. Проверьте интернет."));
   }
   const result = (await response.json().catch(() => null)) as { error?: string } | null;
-  if (!response.ok) throw new ApiError(response.status, result?.error ?? "Сервер временно недоступен. Попробуйте позже.");
+  if (!response.ok) throw new ApiError(response.status, result?.error ?? t("Сервер временно недоступен. Попробуйте позже."));
   return result as T;
 }
 
@@ -135,7 +138,7 @@ export function useCloudSync(
   const enqueue = useCallback(<T,>(step: (current: Session) => Promise<T>, quiet = false) => {
     const run = queueRef.current.then(async () => {
       const current = sessionRef.current;
-      if (!current) throw new ApiError(401, "Войдите в аккаунт.");
+      if (!current) throw new ApiError(401, t("Войдите в аккаунт."));
       if (!quiet) setStatus("syncing");
       try {
         const result = await step(current);
@@ -145,7 +148,7 @@ export function useCloudSync(
         if (error instanceof ApiError && error.status === 401 && sessionRef.current?.token === current.token) {
           updateSession(null);
           setStatus("idle");
-          notify("Сессия истекла. Войдите в аккаунт заново.");
+          notify(t("Сессия истекла. Войдите в аккаунт заново."));
         } else if (error instanceof ApiError && error.status === 0) {
           setStatus("error");
         }
@@ -208,7 +211,7 @@ export function useCloudSync(
 
   const authed = useCallback(<T,>(body: Record<string, unknown>) => {
     const current = sessionRef.current;
-    if (!current) return Promise.reject(new ApiError(401, "Войдите в аккаунт."));
+    if (!current) return Promise.reject(new ApiError(401, t("Войдите в аккаунт.")));
     return api<T>("/api/auth", body, current.token);
   }, []);
 
@@ -243,7 +246,7 @@ export function useCloudSync(
     },
     finishAppGoogleLogin: async (code: string) => {
       const verifier = localStorage.getItem(VERIFIER_KEY);
-      if (!verifier) throw new ApiError(400, "Вход не завершён. Попробуйте ещё раз.");
+      if (!verifier) throw new ApiError(400, t("Вход не завершён. Попробуйте ещё раз."));
       localStorage.removeItem(VERIFIER_KEY);
       startSession(await api<AccountResponse>("/api/auth", { action: "google-handoff", code, verifier }));
     },

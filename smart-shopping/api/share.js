@@ -18,6 +18,7 @@ import {
   takeAttempt,
 } from "./_lib.js";
 import { accessFilter, familyMembers, sharedWithFamily } from "./_family.js";
+import { languageOf, tr } from "./_i18n.js";
 
 const INVITE_DAYS = 7;
 
@@ -48,8 +49,8 @@ const actions = {
       const to = parseEmail(body.email);
       await sendEmail(
         to,
-        `${user.email} приглашает вас в список «${list.data.name}»`,
-        `Здравствуйте!\n\n${user.email} приглашает вас вести вместе список покупок «${list.data.name}» в приложении «Корзина».\n\nЧтобы присоединиться, откройте ссылку и войдите в аккаунт:\n${link}\n\nСсылка действует ${INVITE_DAYS} дней.`,
+        tr(languageOf(request), "{from} приглашает вас в список «{list}»", { from: user.email, list: list.data.name }),
+        tr(languageOf(request), "Здравствуйте!\n\n{from} приглашает вас вести вместе список покупок «{list}» в приложении «Корзина».\n\nЧтобы присоединиться, откройте ссылку и войдите в аккаунт:\n{link}\n\nСсылка действует {days} дней.", { from: user.email, list: list.data.name, link, days: INVITE_DAYS }),
       );
     }
     return json(200, { link });

@@ -4,13 +4,14 @@ import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
 import { alive, progress, type ShoppingList } from "./model";
+import { t } from "./i18n";
 
 export const isNativeApp = Capacitor.isNativePlatform();
 
 export async function shareText(title: string, text: string): Promise<"shared" | "copied" | "failed"> {
   try {
     if (isNativeApp) {
-      await Share.share({ title, text, dialogTitle: "Отправить список" });
+      await Share.share({ title, text, dialogTitle: t("Отправить список") });
       return "shared";
     }
     if (navigator.share) {
@@ -59,8 +60,8 @@ export async function scheduleReminders(lists: ShoppingList[]) {
     await LocalNotifications.schedule({
       notifications: due.map((list) => ({
         id: notificationId(list.id),
-        title: "Пора за покупками",
-        body: progress(list).left ? `${list.name}: осталось купить ${progress(list).left}` : list.name,
+        title: t("Пора за покупками"),
+        body: progress(list).left ? t("{name}: осталось купить {left}", { name: list.name, left: progress(list).left }) : list.name,
         schedule: { at: new Date(list.remindAt!), allowWhileIdle: true },
         extra: { listId: list.id },
       })),
@@ -98,8 +99,8 @@ export function timerNotificationId(timerId: string) {
 function timerChannel() {
   channelReady ??= LocalNotifications.createChannel({
     id: TIMER_CHANNEL,
-    name: "Таймеры готовки",
-    description: "Сигнал, когда шаг рецепта готов",
+    name: t("Таймеры готовки"),
+    description: t("Сигнал, когда шаг рецепта готов"),
     importance: 5,
     visibility: 1,
     vibration: true,
@@ -179,7 +180,7 @@ export function ringTimer() {
   }
   if (!isNativeApp && "Notification" in window && Notification.permission === "granted" && document.visibilityState !== "visible") {
     try {
-      new Notification("Таймер готовки", { body: "Шаг рецепта готов" });
+      new Notification(t("Таймер готовки"), { body: t("Шаг рецепта готов") });
     } catch {
       // Some mobile browsers only allow notifications from a service worker.
     }
@@ -202,8 +203,8 @@ export function updateWidget(list: ShoppingList | undefined) {
   const items = list ? alive(list.items).filter((item) => !item.purchased) : [];
   bridge.setWidget(
     JSON.stringify({
-      title: list?.name ?? "Корзина",
-      subtitle: list ? (items.length ? `Осталось купить: ${items.length}` : "Всё куплено") : "Нет списков",
+      title: list?.name ?? t("Корзина"),
+      subtitle: list ? (items.length ? t("Осталось купить: {length}", { length: items.length }) : t("Всё куплено")) : t("Нет списков"),
       items: items.slice(0, 12).map((item) => `${item.name} — ${item.quantity} ${item.unit}`),
     }),
   );
@@ -230,7 +231,7 @@ function loadGoogle() {
     script.onload = () => resolve((window as unknown as { google: GoogleIdentity }).google);
     script.onerror = () => {
       googleScript = null;
-      reject(new Error("Google недоступен"));
+      reject(new Error(t("Google недоступен")));
     };
     document.head.append(script);
   });

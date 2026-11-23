@@ -8,6 +8,7 @@ import { HomeScreen } from "./app/HomeScreen";
 import { ListScreen } from "./app/ListScreen";
 import { AppSheet } from "./app/sheets";
 import { useShoppingApp } from "./app/useShoppingApp";
+import { t } from "./i18n";
 
 export default function Prototype() {
   const app = useShoppingApp();
@@ -23,8 +24,8 @@ export default function Prototype() {
       {toast && (
         <div className="toast" role="status">
           <span>{toast.text}</span>
-          {toast.undo && <button className="toast-undo" onClick={app.undo}>Отменить</button>}
-          <button onClick={() => app.setToast(null)} aria-label="Закрыть"><Cross2Icon /></button>
+          {toast.undo && <button className="toast-undo" onClick={app.undo}>{t("Отменить")}</button>}
+          <button onClick={() => app.setToast(null)} aria-label={t("Закрыть")}><Cross2Icon /></button>
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { HttpError, appOrigin, authenticate, database, json, parseEmail, preflight, randomToken, readJson, route, sendEmail, takeAttempt } from "./_lib.js";
 import { MAX_FAMILY, leaveFamily } from "./_family.js";
+import { languageOf, tr } from "./_i18n.js";
 
 const INVITE_DAYS = 7;
 
@@ -47,7 +48,7 @@ const actions = {
         family = await familyOf(db, user);
       }
     }
-    if (family.members.length >= MAX_FAMILY) throw new HttpError(403, `В семье может быть не больше ${MAX_FAMILY} человек.`);
+    if (family.members.length >= MAX_FAMILY) throw new HttpError(403, "В семье может быть не больше {max} человек.", { max: MAX_FAMILY });
     const token = randomToken();
     await db.collection("invites").insertOne({ _id: token, familyId: family._id, invitedBy: user._id, expiresAt: new Date(Date.now() + INVITE_DAYS * 86_400_000) });
     const link = `${appOrigin(request)}/join?family=${token}`;
@@ -55,8 +56,8 @@ const actions = {
       if (!user.emailVerified) throw new HttpError(403, "Подтвердите свою почту в настройках, чтобы отправлять приглашения письмом.");
       await sendEmail(
         parseEmail(body.email),
-        `${user.email} приглашает вас в семью в «Корзине»`,
-        `Здравствуйте!\n\n${user.email} приглашает вас в семью в приложении «Корзина». В семье все списки покупок общие: изменения видны всем сразу.\n\nЧтобы присоединиться, откройте ссылку и войдите в аккаунт:\n${link}\n\nСсылка действует ${INVITE_DAYS} дней.`,
+        tr(languageOf(request), "{from} приглашает вас в семью в «Корзине»", { from: user.email }),
+        tr(languageOf(request), "Здравствуйте!\n\n{from} приглашает вас в семью в приложении «Корзина». В семье все списки покупок общие: изменения видны всем сразу.\n\nЧтобы присоединиться, откройте ссылку и войдите в аккаунт:\n{link}\n\nСсылка действует {days} дней.", { from: user.email, link, days: INVITE_DAYS }),
       );
     }
     return json(200, { link });
@@ -79,7 +80,7 @@ const actions = {
       if (error?.code === 11000) throw new HttpError(409, "Вы уже в другой семье. Сначала выйдите из неё в настройках.");
       throw error;
     });
-    if (joined.matchedCount === 0) throw new HttpError(403, `В семье может быть не больше ${MAX_FAMILY} человек.`);
+    if (joined.matchedCount === 0) throw new HttpError(403, "В семье может быть не больше {max} человек.", { max: MAX_FAMILY });
     // The family's devices only ask for lists changed since they last looked: the newcomer's
     // lists count as changed now, so that they reach everyone.
     await db.collection("lists").updateMany({ members: user._id }, { $set: { serverUpdatedAt: Date.now() } });

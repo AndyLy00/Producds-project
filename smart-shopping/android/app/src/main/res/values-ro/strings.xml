@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Korzina</string>
+    <string name="title_activity_main">Korzina</string>
+    <string name="widget_description">Ce a mai rămas de cumpărat în prima listă</string>
+    <string name="widget_empty">Deschideți aplicația pentru a afișa o listă</string>
+</resources>

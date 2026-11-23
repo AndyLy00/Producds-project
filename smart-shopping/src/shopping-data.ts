@@ -1,6 +1,7 @@
 // On-device storage of the app's data: IndexedDB, with a copy in localStorage in case IndexedDB is
 // unavailable. Shapes and operations: model.ts; the account copy: cloud-sync.ts.
 import { migrate, seedData, type ShoppingData } from "./model";
+import { t } from "./i18n";
 
 export type { ShoppingData } from "./model";
 
@@ -15,7 +16,7 @@ class IndexedShoppingRepository implements ShoppingRepository {
   private database: Promise<IDBDatabase> | null = null;
 
   private openDatabase() {
-    if (!("indexedDB" in window)) return Promise.reject(new Error("IndexedDB недоступна"));
+    if (!("indexedDB" in window)) return Promise.reject(new Error(t("IndexedDB недоступна")));
     if (this.database) return this.database;
     this.database = new Promise((resolve, reject) => {
       const request = indexedDB.open("smart-shopping", 1);
@@ -24,7 +25,7 @@ class IndexedShoppingRepository implements ShoppingRepository {
         if (!database.objectStoreNames.contains("snapshots")) database.createObjectStore("snapshots");
       };
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error("Не удалось открыть локальную базу"));
+      request.onerror = () => reject(request.error ?? new Error(t("Не удалось открыть локальную базу")));
     });
     return this.database;
   }
@@ -34,7 +35,7 @@ class IndexedShoppingRepository implements ShoppingRepository {
     return new Promise<ShoppingData | null>((resolve, reject) => {
       const request = database.transaction("snapshots", "readonly").objectStore("snapshots").get("current");
       request.onsuccess = () => resolve(migrate(request.result));
-      request.onerror = () => reject(request.error ?? new Error("Не удалось прочитать списки"));
+      request.onerror = () => reject(request.error ?? new Error(t("Не удалось прочитать списки")));
     });
   }
 
@@ -44,7 +45,7 @@ class IndexedShoppingRepository implements ShoppingRepository {
       const transaction = database.transaction("snapshots", "readwrite");
       transaction.objectStore("snapshots").put(data, "current");
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Не удалось сохранить списки"));
+      transaction.onerror = () => reject(transaction.error ?? new Error(t("Не удалось сохранить списки")));
     });
   }
 }
@@ -79,7 +80,7 @@ class FallbackRepository implements ShoppingRepository {
 
   async save(data: ShoppingData) {
     const writes = await Promise.allSettled([this.preferred.save(data), this.fallback.save(data)]);
-    if (writes.every((result) => result.status === "rejected")) throw new Error("Не удалось сохранить данные на устройстве");
+    if (writes.every((result) => result.status === "rejected")) throw new Error(t("Не удалось сохранить данные на устройстве"));
   }
 }
 
