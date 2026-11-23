@@ -33,8 +33,8 @@ function androidApp(): Plugin {
       },
     },
     async closeBundle() {
-      // The Android app link file (.well-known) only matters on the site.
-      const unused = outDir.endsWith("android") ? [...unusedInApp, ".well-known"] : unusedInApp;
+      // The Android app link file (.well-known) and the privacy policy page only matter on the site.
+      const unused = outDir.endsWith("android") ? [...unusedInApp, ".well-known", "privacy.html"] : unusedInApp;
       await Promise.all(unused.map((path) => rm(`${outDir}/${path}`, { recursive: true, force: true })));
     },
   };

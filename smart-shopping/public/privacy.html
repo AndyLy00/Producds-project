@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Политика конфиденциальности — Корзина</title>
+  <meta name="description" content="Какие данные хранит приложение «Корзина», где и как их удалить.">
+  <style>
+    :root {
+      --paper: #faf7ee;
+      --ink: #203f2b;
+      --muted: #6f7062;
+      --line: #e5dfcf;
+      --green: #2f603c;
+      --card: #fffdf8;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --paper: #18241c; --ink: #f4f0e5; --muted: #a8ad9e; --line: #35483a; --green: #9ac58f; --card: #202f24; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--green); font-weight: 800; text-decoration: none; }
+    .brand span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: var(--green); color: var(--paper); font-size: 16px; }
+    h1 { margin: 28px 0 4px; font-size: 30px; line-height: 1.2; }
+    .updated { margin: 0 0 28px; color: var(--muted); font-size: 14px; }
+    h2 { margin: 32px 0 8px; font-size: 19px; }
+    p, li { color: var(--ink); }
+    ul { padding-left: 22px; }
+    li { margin: 4px 0; }
+    .card { margin: 20px 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+    a { color: var(--green); }
+    footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="brand" href="/"><span aria-hidden="true">К</span>Корзина</a>
+    <h1>Политика конфиденциальности</h1>
+    <p class="updated">Действует с 23 ноября 2026 года</p>
+
+    <div class="card">
+      Коротко: «Корзина» хранит только то, что нужно для списков покупок и рецептов. Мы не показываем рекламу, не продаём и не передаём ваши данные для рекламы и не следим за вами аналитикой. Аккаунт и всё, что с ним связано, можно удалить в любой момент прямо в приложении.
+    </div>
+
+    <h2>Без аккаунта</h2>
+    <p>Если вы не входите в аккаунт, списки, рецепты, фото и настройки хранятся только на вашем устройстве и никуда не отправляются.</p>
+
+    <h2>Что хранится, если вы вошли в аккаунт</h2>
+    <ul>
+      <li><b>Адрес почты</b> — чтобы вы могли войти и восстановить доступ.</li>
+      <li><b>Пароль</b> — только в виде необратимого хеша (scrypt); сам пароль мы не знаем.</li>
+      <li><b>Вход через Google</b> — Google сообщает нам адрес почты и идентификатор аккаунта Google. Больше ничего мы у Google не запрашиваем и к вашему аккаунту Google доступа не получаем.</li>
+      <li><b>Ваши данные в приложении</b>: списки покупок, рецепты и их фото, магазины, шаблоны, свои категории и выбранная тема — чтобы они были на всех ваших устройствах.</li>
+      <li><b>Совместные списки и семья</b>: кто в них участвует. Участники видят адреса почты друг друга.</li>
+      <li><b>Служебные записи</b>: счётчики попыток входа (по адресу почты и IP-адресу) для защиты от подбора пароля. Они удаляются сами через 15–60 минут.</li>
+    </ul>
+    <p>Таймеры готовки и напоминания хранятся только на устройстве.</p>
+
+    <h2>Где хранятся данные</h2>
+    <p>Сервер приложения работает на платформе <a href="https://vercel.com/legal/privacy-policy" rel="noopener">Vercel</a>, данные хранятся в базе <a href="https://www.mongodb.com/legal/privacy" rel="noopener">MongoDB Atlas</a>. Если приложение отправляет вам письмо (код подтверждения, сброс пароля или приглашение), оно уходит через сервис <a href="https://resend.com/legal/privacy-policy" rel="noopener">Resend</a>. Эти сервисы обрабатывают данные только для работы «Корзины».</p>
+
+    <h2>Кто видит ваши данные</h2>
+    <p>Только вы — и люди, с которыми вы сами поделились: участники совместного списка видят этот список, члены семьи видят все ваши списки, кроме отмеченных как личные. Рецепты и фото видны только вам. Фото рецептов доступны по длинной случайной ссылке, которую нельзя угадать.</p>
+
+    <h2>Как удалить данные</h2>
+    <p>В приложении: <b>Настройки → Аккаунт → Удалить аккаунт</b>. Сразу удаляются аккаунт, ваши рецепты, фото и настройки на сервере, а вы выходите из семьи. Списки, которые вы вели только сами, удаляются; совместные остаются у других участников. Данные на вашем устройстве остаются, пока вы не удалите приложение.</p>
+
+    <h2>Дети</h2>
+    <p>Приложение не предназначено для сбора данных детей младше 13 лет.</p>
+
+    <h2>Изменения и вопросы</h2>
+    <p>Если политика изменится, новая версия появится на этой странице с новой датой. Вопросы можно задать через <a href="https://github.com/AndyLy00/Producds-project/issues" rel="noopener">страницу проекта на GitHub</a>.</p>
+
+    <footer><a href="/">Открыть «Корзину»</a></footer>
+  </main>
+</body>
+</html>

@@ -1,5 +1,6 @@
 // Settings: theme, account, stores and own categories.
 import { BookmarkIcon, ChevronRightIcon, HomeIcon, EnvelopeClosedIcon, ExitIcon, LockClosedIcon, MixIcon, MoonIcon, PersonIcon, PlusIcon, SunIcon, TrashIcon } from "@radix-ui/react-icons";
+import { API_ORIGIN } from "../api-origin";
 import { alive } from "../model";
 import type { ShoppingApp } from "./useShoppingApp";
 
@@ -39,5 +40,6 @@ export function SettingsTab({ app }: { app: ShoppingApp }) {
     </section>
 
     <div className="settings-note">{cloud.email ? "Списки хранятся на этом устройстве и в вашем аккаунте. Без интернета приложение продолжает работать, изменения сохранятся при следующем подключении." : "Сейчас покупки сохраняются только на этом устройстве. Войдите в аккаунт, чтобы они не потерялись и были доступны на других устройствах."}</div>
+    <a className="settings-link" href={`${API_ORIGIN}/privacy`} target="_blank" rel="noopener">Политика конфиденциальности</a>
   </>;
 }

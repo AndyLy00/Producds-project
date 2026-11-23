@@ -491,3 +491,4 @@
 .member-row .member-remove svg { width: 13px; height: 13px; }
 .family-invite { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 15px; background: var(--white); }
 .family-invite p { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.45; }
+.settings-link { display: block; margin: 14px 0 0; color: var(--muted); font-size: 11px; text-align: center; text-decoration: underline; }
