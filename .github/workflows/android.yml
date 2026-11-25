@@ -10,6 +10,11 @@ on:
       - "smart-shopping/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
+    inputs:
+      test_ads:
+        description: "Test build: Google's test ads, nothing published (APK in the run's artifacts)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -28,9 +33,11 @@ jobs:
       APP_VERSION_CODE: ${{ github.run_number }}
       APP_VERSION_NAME: 1.0.${{ github.run_number }}
       # AdMob (src/ads.ts), set under Settings → Secrets and variables → Actions → Variables.
-      # Without ADMOB_BANNER_ID the app shows no ads.
+      # Real ads go only into the Google Play bundle: the APK on GitHub is what the developer
+      # installs, and an AdMob account must never see its owner's impressions or clicks. The
+      # GitHub APK has no ads; a test build (test_ads) shows Google's test ads.
       ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
-      ADMOB_BANNER_ID: ${{ vars.ADMOB_BANNER_ID }}
+      ADMOB_TESTING: ${{ inputs.test_ads && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +57,8 @@ jobs:
       - run: npm run check:runtime
 
       - name: Build the web bundle and sync it into the Android project
+        env:
+          ADMOB_BANNER_ID: ${{ inputs.test_ads && vars.ADMOB_BANNER_ID || '' }}
         run: npm run build:android
 
       # Every build must be signed with the same key, or Android refuses to install it over
@@ -77,9 +86,19 @@ jobs:
 
       # The same app for Google Play: an App Bundle, without the self-update banner that Play's
       # rules forbid. Play Console takes it from the run's artifacts.
+      # A test build is for looking at the app: it is not released anywhere.
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.test_ads }}
+        with:
+          name: korzina-test-ads-${{ github.run_number }}
+          path: ${{ runner.temp }}/korzina.apk
+          retention-days: 30
+
       - name: Build the Google Play bundle
+        if: ${{ !inputs.test_ads }}
         env:
           APP_STORE: play
+          ADMOB_BANNER_ID: ${{ vars.ADMOB_BANNER_ID }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
@@ -89,12 +108,14 @@ jobs:
           cp app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/korzina-play-${APP_VERSION_CODE}.aab"
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.test_ads }}
         with:
           name: korzina-play-${{ github.run_number }}
           path: ${{ runner.temp }}/korzina-play-${{ github.run_number }}.aab
           retention-days: 90
 
       - name: Publish the release
+        if: ${{ !inputs.test_ads }}
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
