@@ -67,9 +67,21 @@ export function cleanList(value) {
     // Hidden from the family (api/_family.js); only the list's own members see it.
     ...(value.personal === true ? { personal: true } : {}),
     ...(value.remindAt ? { remindAt: time(value.remindAt) } : {}),
+    ...(cleanRepeat(value.repeat) ? { repeat: cleanRepeat(value.repeat) } : {}),
     ...tombstone(value),
     items: entities(value.items, 1000, cleanItem),
   };
+}
+
+// A repeating reminder (src/model.ts, Repeat), or null when it is not a valid one.
+function cleanRepeat(value) {
+  if (!value || typeof value !== "object" || !["day", "week", "month"].includes(value.every)) return null;
+  const match = typeof value.time === "string" ? /^(\d{2}):(\d{2})$/.exec(value.time) : null;
+  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) return null;
+  const [low, high] = value.every === "month" ? [1, 31] : [0, 6];
+  const days = Array.isArray(value.days) ? [...new Set(value.days.filter((day) => Number.isInteger(day) && day >= low && day <= high))].slice(0, 31) : [];
+  if (value.every !== "day" && days.length === 0) return null;
+  return { every: value.every, days: value.every === "day" ? [] : days, time: value.time };
 }
 
 export function cleanProfile(value) {

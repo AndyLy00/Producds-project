@@ -3,7 +3,7 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
-import { alive, progress, type ShoppingList } from "./model";
+import { alive, progress, repeatTimes, type ShoppingList } from "./model";
 import { t } from "./i18n";
 
 export const isNativeApp = Capacitor.isNativePlatform();
@@ -38,6 +38,11 @@ function notificationId(listId: string) {
   return Math.abs(hash) % 2_000_000_000 || 1;
 }
 
+// Occurrences of a repeating reminder scheduled ahead (a month of daily reminders), and all
+// reminders at most: Android keeps only so many alarms for an app.
+const REPEATS_AHEAD = 30;
+const MAX_SCHEDULED = 200;
+
 export async function allowReminders() {
   try {
     const current = await LocalNotifications.checkPermissions();
@@ -55,17 +60,28 @@ export async function scheduleReminders(lists: ShoppingList[]) {
     // Only reminders: cooking timers (below) have their own range of ids and must survive this.
     const pending = (await LocalNotifications.getPending()).notifications.filter(({ id }) => id < TIMER_IDS);
     if (pending.length) await LocalNotifications.cancel({ notifications: pending.map(({ id }) => ({ id })) });
-    const due = lists.filter((list) => !list.deleted && !list.completedAt && list.remindAt && list.remindAt > Date.now());
-    if (!due.length) return;
-    await LocalNotifications.schedule({
-      notifications: due.map((list) => ({
-        id: notificationId(list.id),
-        title: t("Пора за покупками"),
-        body: progress(list).left ? t("{name}: осталось купить {left}", { name: list.name, left: progress(list).left }) : list.name,
-        schedule: { at: new Date(list.remindAt!), allowWhileIdle: true },
-        extra: { listId: list.id },
-      })),
-    });
+    const now = Date.now();
+    const notifications = lists
+      .filter((list) => !list.deleted && !list.completedAt)
+      .flatMap((list) => {
+        const body = progress(list).left ? t("{name}: осталось купить {left}", { name: list.name, left: progress(list).left }) : list.name;
+        // A repeating reminder is scheduled as its next occurrences; the app schedules more each
+        // time it is opened.
+        const times = [
+          ...(list.remindAt && list.remindAt > now ? [{ key: list.id, at: list.remindAt }] : []),
+          ...(list.repeat ? repeatTimes(list.repeat, REPEATS_AHEAD, now).map((at) => ({ key: `${list.id}:${at}`, at })) : []),
+        ];
+        return times.map(({ key, at }) => ({
+          id: notificationId(key),
+          title: t("Пора за покупками"),
+          body,
+          schedule: { at: new Date(at), allowWhileIdle: true },
+          extra: { listId: list.id },
+        }));
+      })
+      .sort((a, b) => a.schedule.at.getTime() - b.schedule.at.getTime())
+      .slice(0, MAX_SCHEDULED);
+    if (notifications.length) await LocalNotifications.schedule({ notifications });
   } catch (error) {
     console.warn("Reminders are not available", error);
   }

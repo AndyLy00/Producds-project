@@ -46,11 +46,16 @@ export type ShoppingList = {
   storeId?: string;
   sortMode: "category" | "manual";
   remindAt?: number;
+  repeat?: Repeat;
   // Hidden from the family (api/_family.js): only the list's own members see it.
   personal?: boolean;
   deleted?: boolean;
   items: ShoppingItem[];
 };
+
+// A reminder that comes back at `time` ("HH:MM"): every day, on the given weekdays (0 is Sunday)
+// or on the given day of the month (1–31; a shorter month uses its last day).
+export type Repeat = { every: "day" | "week" | "month"; days: number[]; time: string };
 
 export type Store = { id: string; name: string; categoryOrder: string[]; updatedAt: number; deleted?: boolean };
 export type Template = { id: string; name: string; items: Product[]; updatedAt: number; deleted?: boolean };
@@ -462,4 +467,57 @@ export function formatReminder(time: number) {
   if (date.toDateString() === today.toDateString()) return t("сегодня, {time}", { time: time_ });
   if (date.toDateString() === tomorrow.toDateString()) return t("завтра, {time}", { time: time_ });
   return `${date.toLocaleDateString(locale(), { weekday: "short", day: "numeric", month: "short" })}, ${time_}`;
+}
+
+// --- Repeating reminders -----------------------------------------------------------------------
+
+function repeatClock(repeat: Repeat) {
+  const [hours, minutes] = repeat.time.split(":").map(Number);
+  return { hours: hours || 0, minutes: minutes || 0 };
+}
+
+// The next `count` times a repeating reminder comes, after `from`.
+export function repeatTimes(repeat: Repeat, count: number, from = Date.now()) {
+  const { hours, minutes } = repeatClock(repeat);
+  const times: number[] = [];
+  const start = new Date(from);
+  // Day by day for a year at most: enough for any rule, and a rule without days gives nothing.
+  for (let offset = 0; offset < 400 && times.length < count; offset += 1) {
+    const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset, hours, minutes);
+    if (day.getTime() <= from) continue;
+    const lastOfMonth = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
+    const matches =
+      repeat.every === "day" ||
+      (repeat.every === "week" && repeat.days.includes(day.getDay())) ||
+      (repeat.every === "month" && repeat.days.some((wanted) => Math.min(wanted, lastOfMonth) === day.getDate()));
+    if (matches) times.push(day.getTime());
+  }
+  return times;
+}
+
+// The next reminder of a list, one-time or repeating.
+export function nextReminder(list: ShoppingList, now = Date.now()) {
+  const once = list.remindAt && list.remindAt > now ? list.remindAt : undefined;
+  const repeated = list.repeat ? repeatTimes(list.repeat, 1, now)[0] : undefined;
+  if (once === undefined) return repeated;
+  return repeated === undefined ? once : Math.min(once, repeated);
+}
+
+// Monday first, as calendars here are.
+export const weekdays = [1, 2, 3, 4, 5, 6, 0];
+
+export function weekdayName(day: number) {
+  // 4 January 1970 was a Sunday.
+  return new Date(1970, 0, 4 + day).toLocaleDateString(locale(), { weekday: "short" });
+}
+
+export function formatRepeat(repeat: Repeat) {
+  const time = repeat.time;
+  if (repeat.every === "day") return t("каждый день в {time}", { time });
+  if (repeat.every === "week") {
+    const days = weekdays.filter((day) => repeat.days.includes(day));
+    if (days.length === 7) return t("каждый день в {time}", { time });
+    return t("по дням: {days}, в {time}", { days: days.map(weekdayName).join(", "), time });
+  }
+  return t("каждый месяц, {day}-го числа в {time}", { day: [...repeat.days].sort((a, b) => a - b).join(", "), time });
 }

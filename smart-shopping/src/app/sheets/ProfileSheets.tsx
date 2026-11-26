@@ -1,18 +1,12 @@
 // Sheets for what belongs to the account rather than to a list: recipes, stores, categories.
 import { CameraIcon, Cross2Icon, DragHandleDots2Icon, ImageIcon, PlayIcon, PlusIcon, TimerIcon, TrashIcon } from "@radix-ui/react-icons";
-import { useRef, type PointerEvent } from "react";
+import { useRef } from "react";
 import { KeyboardInput, KeyboardTextarea } from "../../mobile";
 import { alive, formatMinutes, stepsOf, totalMinutes } from "../../model";
 import { moveItem, Sortable } from "../../sortable";
-import { Field, FormError, RecipePhoto, SheetClose, type SheetProps } from "../ui";
+import { Field, FormError, keepFocus, RecipePhoto, SheetClose, type SheetProps } from "../ui";
 import { t } from "../../i18n";
 
-// While a field has focus the sheet is taller (src/native/index.tsx); a tap that took the focus
-// away would shrink it and move the tapped button away before the click lands. The buttons
-// below keep the focus instead; closing the sheet hides the keyboard anyway.
-const keepFocus = (event: PointerEvent<HTMLElement>) => {
-  if ((event.target as HTMLElement).closest("button")) event.preventDefault();
-};
 
 export function RecipeSheet({ app, sheet }: SheetProps<"recipe">) {
   const { recipeForm, setRecipeForm, keyboard } = app;

@@ -1,7 +1,7 @@
 // Small building blocks shared by the screens and sheets.
-import { BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIcon, PersonIcon, PlusIcon, StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
-import { useState, type ReactNode } from "react";
-import { formatReminder, productImage, type ShoppingItem, type ShoppingList } from "../model";
+import { BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIcon, PersonIcon, PlusIcon, StarFilledIcon, StarIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { useState, type PointerEvent, type ReactNode } from "react";
+import { formatReminder, nextReminder, productImage, type ShoppingItem, type ShoppingList } from "../model";
 import { usePhoto } from "../photos";
 import { formatLei } from "./usePrices";
 import type { DragHandle } from "../sortable";
@@ -37,12 +37,15 @@ export function EmptyState({ title, text, action }: { title: string; text: strin
 export function ListBadges({ app, list }: { app: ShoppingApp; list: ShoppingList }) {
   const sharing = app.data.sharing[list.id];
   const store = app.storeName(list);
-  if (!sharing && !store && !list.remindAt) return null;
+  // A repeating reminder shows when it comes next; a past one-time reminder stays, marked.
+  const next = nextReminder(list);
+  const shown = next ?? (list.remindAt && !list.completedAt ? list.remindAt : undefined);
+  if (!sharing && !store && !shown) return null;
   return (
     <span className="list-badges">
       {sharing && <span className="badge"><PersonIcon /> {sharing.members}</span>}
       {store && <span className="badge"><MixIcon /> {store}</span>}
-      {list.remindAt && <span className={`badge ${list.remindAt < Date.now() ? "badge-alert" : ""}`}><BellIcon /> {formatReminder(list.remindAt)}</span>}
+      {shown && <span className={`badge ${shown < Date.now() ? "badge-alert" : ""}`}>{list.repeat ? <UpdateIcon /> : <BellIcon />} {formatReminder(shown)}</span>}
     </span>
   );
 }
@@ -54,6 +57,13 @@ export function RecipePhoto({ id, className, fallback = null }: { id?: string; c
   if (!source || failed === source) return <>{fallback}</>;
   return <img className={className} src={source} alt="" onError={() => setFailed(source)} />;
 }
+
+// While a field has focus the sheet is taller (src/native/index.tsx); a tap that took the focus
+// away would shrink it and move the tapped button away before the click lands. The buttons
+// in a sheet keep the focus instead; closing the sheet hides the keyboard anyway.
+export const keepFocus = (event: PointerEvent<HTMLElement>) => {
+  if ((event.target as HTMLElement).closest("button")) event.preventDefault();
+};
 
 export function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
   return <label className="form-label">{label}{children}</label>;

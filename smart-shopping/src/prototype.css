@@ -367,6 +367,13 @@
 .chip small { color: var(--muted); font-size: 10px; }
 .chip-fixed > span { padding-right: 11px; color: var(--muted); }
 .chip-button { height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--green); font-size: 12px; font-weight: 700; }
+.chip-button.chip-on { border-color: var(--green); background: var(--green); color: var(--white); }
+.reminder-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.reminder-modes .chip-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.weekday-row .chip-button { padding: 0; text-transform: capitalize; }
+.sheet-hint { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.sheet-hint svg { flex: none; width: 14px; height: 14px; color: var(--green); }
 .action-list { gap: 7px; }
 .action-row { min-height: 54px; }
 .action-danger { color: var(--tomato); }

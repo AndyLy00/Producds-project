@@ -13,6 +13,7 @@ import {
   createId,
   emptyData,
   formatReminder,
+  formatRepeat,
   guessCategory,
   guessMinutes,
   listAsText,
@@ -28,6 +29,7 @@ import {
   toProduct,
   type Product,
   type Recipe,
+  type Repeat,
   type ShoppingData,
   type ShoppingItem,
   type ShoppingList,
@@ -35,7 +37,7 @@ import {
 } from "../model";
 import { loadShoppingData, saveShoppingData } from "../shopping-data";
 import { moveItem } from "../sortable";
-import { blankProduct, errorText, inviteFromAddress, type AccountStep, type Invite, type RecipeForm, type Sheet, type Tab, type Toast } from "./types";
+import { at, blankProduct, errorText, inviteFromAddress, toLocalInput, type AccountStep, type Invite, type RecipeForm, type Sheet, type Tab, type Toast } from "./types";
 import { useTimers } from "./useTimers";
 import { language, setLanguage, t, type Language } from "../i18n";
 
@@ -134,7 +136,7 @@ export function useShoppingApp() {
   const currentList = activeLists.find((list) => list.id === currentListId) ?? null;
 
   // Reminders and the home-screen widget follow the data.
-  const reminderKey = JSON.stringify(activeLists.map((list) => [list.id, list.remindAt, list.name, progress(list).left]));
+  const reminderKey = JSON.stringify(activeLists.map((list) => [list.id, list.remindAt, list.repeat, list.name, progress(list).left]));
   useEffect(() => {
     if (ready) void scheduleReminders(activeLists);
   }, [ready, reminderKey]);
@@ -322,6 +324,16 @@ export function useShoppingApp() {
     }
   }
 
+  // A new list whose reminder is set right away: the list opens with the reminder sheet over it.
+  function addListWithReminder() {
+    if (!listName.trim()) return;
+    const list = newList(listName);
+    change((previous) => ({ ...previous, lists: [list, ...previous.lists] }));
+    openList(list.id);
+    setReminderValue(toLocalInput(at(1, 10)));
+    openSheet({ kind: "reminder", listId: list.id });
+  }
+
   function deleteList(list: ShoppingList) {
     setSheet(null);
     setCurrentListId(null);
@@ -347,7 +359,8 @@ export function useShoppingApp() {
   }
 
   function repeatList(list: ShoppingList) {
-    addList(addProducts(newList(list.name), alive(list.items).map(toProduct)));
+    // The new list takes over the repeating reminder: the completed one no longer reminds.
+    addList(addProducts({ ...newList(list.name), ...(list.repeat ? { repeat: list.repeat } : {}) }, alive(list.items).map(toProduct)));
   }
 
   function saveAsTemplate(list: ShoppingList) {
@@ -621,6 +634,24 @@ export function useShoppingApp() {
     );
   }
 
+  // A repeating reminder of a list; undefined removes it. It stays when the list is completed
+  // and comes back if the list is restored.
+  function setRepeat(listId: string, repeat: Repeat | undefined) {
+    if (repeat && repeat.every !== "day" && repeat.days.length === 0) {
+      setFormError(repeat.every === "week" ? t("Выберите хотя бы один день недели.") : t("Выберите число месяца."));
+      return;
+    }
+    patchList(listId, { repeat });
+    closeSheet();
+    if (!repeat) {
+      notify(t("Повторяющееся напоминание убрано"));
+      return;
+    }
+    allowReminders().then((allowed) =>
+      notify(allowed ? t("Будем напоминать {rule}", { rule: formatRepeat(repeat) }) : t("Напоминание сохранено, но уведомления запрещены — разрешите их в настройках")),
+    );
+  }
+
   // --- Account -------------------------------------------------------------------------------------
 
   function openAccount(step: AccountStep) {
@@ -743,17 +774,17 @@ export function useShoppingApp() {
     // State
     data, tab, setTab, query, setQuery, sheet, form, setForm, listName, setListName, quickName, setQuickName,
     showPurchased, setShowPurchased, toast, setToast, recipeForm, setRecipeForm, storeForm, setStoreForm,
-    categoryName, setCategoryName, reminderValue, setReminderValue, credentials, setCredential, formError, busy,
+    categoryName, setCategoryName, reminderValue, setReminderValue, credentials, setCredential, formError, setFormError, busy,
     shareState, setShareState, familyState, setFamilyState, googleButton, keyboard, cloud,
     // Derived
     activeLists, history, categories, currentList, favorites, storeName, sheetList, hints, cooking, cookingRecipe, timers, exactAlarms,
     // Actions
     notify, undo, patchList, patchItem, removeEntity, toggleDarkMode, openSheet, closeSheet,
-    openList, closeList: () => setCurrentListId(null), startNewList, addList, submitListName, deleteList, completeList, repeatList, saveAsTemplate, sendAsText,
+    openList, closeList: () => setCurrentListId(null), startNewList, addList, addListWithReminder, submitListName, deleteList, completeList, repeatList, saveAsTemplate, sendAsText,
     openProductSheet, saveProduct, addQuick, quickAdd, deleteProduct, clearPurchased, toggleSortMode, reorder, addProductsTo, addToSomeList,
     openRecipe, saveRecipe, editStep, addStep, removeStep, moveStep, pickRecipePhoto, removeRecipePhoto,
     startCooking, goToStep, stopCooking, startStepTimer, allowExactAlarms,
-    openStore, saveStore, openCategories, addCategory, setReminder,
+    openStore, saveStore, openCategories, addCategory, setReminder, setRepeat,
     lang, changeLanguage,
     openFamily, joinFamily, leaveFamily, togglePersonal,
     openAccount, run, submitAccount, openPasswordSheet, openDeleteAccount, startVerification, signOut, openShare,

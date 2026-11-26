@@ -449,6 +449,22 @@ const ro: Record<string, string> = {
   "л": "l",
   "мл": "ml",
   "уп.": "pachet",
+  "Создать и настроить напоминание": "Creați și setați un memento",
+  "Один раз": "O dată",
+  "Повторять": "Repetat",
+  "Каждый день": "În fiecare zi",
+  "По дням недели": "În anumite zile",
+  "Раз в месяц": "O dată pe lună",
+  "Число месяца": "Ziua lunii",
+  "Время": "Ora",
+  "Будем напоминать {rule}": "Vă vom aminti {rule}",
+  "Не повторять": "Nu mai repetați",
+  "Выберите хотя бы один день недели.": "Alegeți cel puțin o zi a săptămânii.",
+  "Выберите число месяца.": "Alegeți o zi a lunii.",
+  "Повторяющееся напоминание убрано": "Mementoul repetat a fost eliminat",
+  "каждый день в {time}": "în fiecare zi la {time}",
+  "по дням: {days}, в {time}": "în zilele: {days}, la {time}",
+  "каждый месяц, {day}-го числа в {time}": "în fiecare lună, pe {day}, la {time}",
 };
 
 export default ro;

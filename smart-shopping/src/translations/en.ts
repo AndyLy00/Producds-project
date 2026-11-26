@@ -449,6 +449,22 @@ const en: Record<string, string> = {
   "л": "l",
   "мл": "ml",
   "уп.": "pack",
+  "Создать и настроить напоминание": "Create and set a reminder",
+  "Один раз": "Once",
+  "Повторять": "Repeat",
+  "Каждый день": "Every day",
+  "По дням недели": "On weekdays",
+  "Раз в месяц": "Once a month",
+  "Число месяца": "Day of the month",
+  "Время": "Time",
+  "Будем напоминать {rule}": "We will remind you {rule}",
+  "Не повторять": "Stop repeating",
+  "Выберите хотя бы один день недели.": "Choose at least one day of the week.",
+  "Выберите число месяца.": "Choose a day of the month.",
+  "Повторяющееся напоминание убрано": "Repeating reminder removed",
+  "каждый день в {time}": "every day at {time}",
+  "по дням: {days}, в {time}": "on {days} at {time}",
+  "каждый месяц, {day}-го числа в {time}": "every month on day {day} at {time}",
 };
 
 export default en;

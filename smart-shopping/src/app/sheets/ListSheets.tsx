@@ -17,13 +17,14 @@ import {
   PlusIcon,
   Share1Icon,
   TrashIcon,
+  UpdateIcon,
 } from "@radix-ui/react-icons";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { KeyboardInput } from "../../mobile";
 import { shareText } from "../../device";
-import { addProducts, alive, formatReminder, guessCategory, newList, progress, units, type Template } from "../../model";
+import { addProducts, alive, formatReminder, formatRepeat, guessCategory, newList, progress, units, weekdayName, weekdays, type Repeat, type Template } from "../../model";
 import { at, nextWeekday, toLocalInput } from "../types";
-import { Field, FormError, SheetClose, type SheetProps as Props } from "../ui";
+import { Field, FormError, keepFocus, SheetClose, type SheetProps as Props } from "../ui";
 import { formatLei, usePrices } from "../usePrices";
 import { t } from "../../i18n";
 
@@ -59,7 +60,10 @@ export function ListNameSheet({ app, sheet }: Props<"list">) {
     <form className="sheet-form" onSubmit={app.submitListName}>
       <SheetClose app={app} />
       <Field label={t("Название списка")}><KeyboardInput placeholder={t("Например, покупки на выходные")} value={app.listName} onChange={(event) => app.setListName(event.target.value)} onBlur={() => app.keyboard.hide()} /></Field>
-      <button className="primary-button" disabled={!app.listName.trim()}>{sheet.listId ? t("Сохранить") : t("Создать список")}</button>
+      <div className="sheet-actions" onPointerDown={keepFocus}>
+        <button className="primary-button" disabled={!app.listName.trim()}>{sheet.listId ? t("Сохранить") : t("Создать список")}</button>
+        {!sheet.listId && <button type="button" className="secondary-button" disabled={!app.listName.trim()} onClick={app.addListWithReminder}><BellIcon /> {t("Создать и настроить напоминание")}</button>}
+      </div>
       {!sheet.listId && templates.length > 0 && (
         <section className="sheet-section">
           <p className="settings-label">{t("ШАБЛОНЫ")}</p>
@@ -98,7 +102,7 @@ export function ListActionsSheet({ app }: Props<"actions">) {
         </button>
       )}
       {action(<Share1Icon />, t("Отправить текстом"), () => void app.sendAsText(list), t("В мессенджер или заметки"))}
-      {action(<BellIcon />, t("Напоминание"), () => { app.setReminderValue(toLocalInput(list.remindAt ?? at(1, 10))); app.openSheet({ kind: "reminder", listId: list.id }); }, list.remindAt ? formatReminder(list.remindAt) : t("Не задано"))}
+      {action(<BellIcon />, t("Напоминание"), () => { app.setReminderValue(toLocalInput(list.remindAt ?? at(1, 10))); app.openSheet({ kind: "reminder", listId: list.id }); }, [list.remindAt && list.remindAt > Date.now() ? formatReminder(list.remindAt) : "", list.repeat ? formatRepeat(list.repeat) : ""].filter(Boolean).join(" · ") || t("Не задано"))}
       {action(<MixIcon />, t("Магазин"), () => app.openSheet({ kind: "store-pick", listId: list.id }), app.storeName(list) ?? t("Не выбран"))}
       {action(<BookmarkIcon />, t("Сохранить как шаблон"), () => app.saveAsTemplate(list))}
       {action(<ArchiveIcon />, t("Завершить"), () => app.completeList(list), t("Перенести в историю"))}
@@ -155,18 +159,61 @@ export function ShareSheet({ app }: Props<"share">) {
 export function ReminderSheet({ app }: Props<"reminder">) {
   const list = app.sheetList;
   if (!list) return null;
+  const [mode, setMode] = useState<"once" | "repeat">(list.repeat && !list.remindAt ? "repeat" : "once");
+  const [repeat, setRepeat] = useState<Repeat>(list.repeat ?? { every: "week", days: [6], time: "10:00" });
   const presets: [string, number][] = [[t("Через час"), Date.now() + 3_600_000], [t("Сегодня, 18:00"), at(0, 18)], [t("Завтра, 10:00"), at(1, 10)], [t("В пятницу, 18:00"), nextWeekday(5, 18)], [t("В субботу, 10:00"), nextWeekday(6, 10)]];
+  const choose = (every: Repeat["every"]) =>
+    setRepeat((previous) => ({ ...previous, every, days: every === "day" ? [] : every === "week" ? (previous.every === "week" ? previous.days : [6]) : previous.every === "month" ? previous.days : [new Date().getDate()] }));
+  const toggleDay = (day: number) =>
+    setRepeat((previous) => ({ ...previous, days: previous.days.includes(day) ? previous.days.filter((entry) => entry !== day) : [...previous.days, day] }));
+  const pressed = (on: boolean) => `chip-button ${on ? "chip-on" : ""}`;
   return (
-    <form className="sheet-form" onSubmit={(event) => { event.preventDefault(); app.setReminder(list.id, new Date(app.reminderValue).getTime()); }}>
+    <form
+      className="sheet-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (mode === "once") app.setReminder(list.id, new Date(app.reminderValue).getTime());
+        else app.setRepeat(list.id, repeat);
+      }}
+    >
       <SheetClose app={app} />
-      <div className="chip-wrap">
-        {presets.filter(([, time]) => time > Date.now()).map(([label, time]) => <button type="button" className="chip-button" key={label} onClick={() => app.setReminder(list.id, time)}>{label}</button>)}
+      <div className="reminder-modes" role="tablist">
+        <button type="button" role="tab" aria-selected={mode === "once"} className={pressed(mode === "once")} onClick={() => { app.setFormError(""); setMode("once"); }}>{t("Один раз")}</button>
+        <button type="button" role="tab" aria-selected={mode === "repeat"} className={pressed(mode === "repeat")} onClick={() => { app.setFormError(""); setMode("repeat"); }}><UpdateIcon /> {t("Повторять")}</button>
       </div>
-      <Field label={t("Своё время")}><KeyboardInput type="datetime-local" value={app.reminderValue} onChange={(event) => app.setReminderValue(event.target.value)} onBlur={() => app.keyboard.hide()} /></Field>
+      {mode === "once" ? (
+        <>
+          <div className="chip-wrap">
+            {presets.filter(([, time]) => time > Date.now()).map(([label, time]) => <button type="button" className="chip-button" key={label} onClick={() => app.setReminder(list.id, time)}>{label}</button>)}
+          </div>
+          <Field label={t("Своё время")}><KeyboardInput type="datetime-local" value={app.reminderValue} onChange={(event) => app.setReminderValue(event.target.value)} onBlur={() => app.keyboard.hide()} /></Field>
+        </>
+      ) : (
+        <>
+          <div className="chip-wrap">
+            <button type="button" aria-pressed={repeat.every === "day"} className={pressed(repeat.every === "day")} onClick={() => choose("day")}>{t("Каждый день")}</button>
+            <button type="button" aria-pressed={repeat.every === "week"} className={pressed(repeat.every === "week")} onClick={() => choose("week")}>{t("По дням недели")}</button>
+            <button type="button" aria-pressed={repeat.every === "month"} className={pressed(repeat.every === "month")} onClick={() => choose("month")}>{t("Раз в месяц")}</button>
+          </div>
+          {repeat.every === "week" && (
+            <div className="weekday-row">
+              {weekdays.map((day) => <button type="button" key={day} aria-pressed={repeat.days.includes(day)} className={pressed(repeat.days.includes(day))} onClick={() => toggleDay(day)}>{weekdayName(day)}</button>)}
+            </div>
+          )}
+          {repeat.every === "month" && (
+            <Field label={t("Число месяца")}>
+              <KeyboardInput type="number" inputMode="numeric" min={1} max={31} value={repeat.days[0] ?? ""} onChange={(event) => { const day = Math.round(Number(event.target.value)); setRepeat((previous) => ({ ...previous, days: day >= 1 && day <= 31 ? [day] : [] })); }} onBlur={() => app.keyboard.hide()} />
+            </Field>
+          )}
+          <Field label={t("Время")}><KeyboardInput type="time" value={repeat.time} onChange={(event) => { const time = event.target.value; if (time) setRepeat((previous) => ({ ...previous, time })); }} onBlur={() => app.keyboard.hide()} /></Field>
+          {(repeat.every === "day" || repeat.days.length > 0) && <p className="sheet-hint"><BellIcon /> {t("Будем напоминать {rule}", { rule: formatRepeat(repeat) })}</p>}
+        </>
+      )}
       <FormError app={app} />
       <div className="sheet-actions">
-        <button className="primary-button" disabled={!app.reminderValue}><BellIcon /> {t("Напомнить")}</button>
-        {list.remindAt && <button type="button" className="destructive-button" onClick={() => app.setReminder(list.id, undefined)}>{t("Убрать напоминание")}</button>}
+        <button className="primary-button" disabled={mode === "once" ? !app.reminderValue : repeat.every !== "day" && repeat.days.length === 0}><BellIcon /> {mode === "once" ? t("Напомнить") : t("Сохранить")}</button>
+        {mode === "once" && list.remindAt && <button type="button" className="destructive-button" onClick={() => app.setReminder(list.id, undefined)}>{t("Убрать напоминание")}</button>}
+        {mode === "repeat" && list.repeat && <button type="button" className="destructive-button" onClick={() => app.setRepeat(list.id, undefined)}>{t("Не повторять")}</button>}
       </div>
     </form>
   );
