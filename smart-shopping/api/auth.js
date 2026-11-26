@@ -30,6 +30,7 @@ import {
 } from "./_lib.js";
 import { languageOf, tr } from "./_i18n.js";
 import { leaveFamily } from "./_family.js";
+import { MAX_DEVICES, pushEnabled } from "./_push.js";
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -180,6 +181,7 @@ const actions = {
       db.collection("lists").deleteMany({ members: { $size: 0 } }),
       db.collection("profiles").deleteOne({ _id: user._id }),
       db.collection("photos").deleteMany({ owner: user._id }),
+      db.collection("devices").deleteMany({ userId: user._id }),
       db.collection("codes").deleteMany({ _id: { $in: [`verify:${user._id}`, `reset:${user._id}`] } }),
       db.collection("users").deleteOne({ _id: user._id }),
     ]);
@@ -229,6 +231,26 @@ const actions = {
   // The app came back from the browser without the korzina://auth link: Chrome does not open an
   // app from a page the user has not tapped, and Google's answer reaches the page without a tap.
   // The app then claims the sign-in with its verifier alone; only it knows the verifier.
+  // The app's push token (api/_push.js): its notifications go to this account from now on, in
+  // the app's language. The same phone signed in to another account takes the token over.
+  async "push-register"(request, body) {
+    const user = await authenticate(request);
+    if (typeof body.token !== "string" || body.token.length < 20 || body.token.length > 4096) throw new HttpError(400, "Некорректный запрос.");
+    const devices = (await database()).collection("devices");
+    await devices.updateOne({ _id: body.token }, { $set: { userId: user._id, lang: languageOf(request), updatedAt: new Date() } }, { upsert: true });
+    // A few phones per account; the ones not seen for longest go first.
+    const extra = await devices.find({ userId: user._id }).sort({ updatedAt: -1 }).skip(MAX_DEVICES).project({ _id: 1 }).toArray();
+    if (extra.length) await devices.deleteMany({ _id: { $in: extra.map((device) => device._id) } });
+    return json(200, { ok: true, push: pushEnabled() });
+  },
+
+  // Signing out: the phone stops getting the account's notifications.
+  async "push-unregister"(request, body) {
+    if (typeof body.token !== "string" || body.token.length > 4096) throw new HttpError(400, "Некорректный запрос.");
+    await (await database()).collection("devices").deleteOne({ _id: body.token });
+    return json(200, { ok: true });
+  },
+
   async "google-handoff-claim"(request, body) {
     if (typeof body.verifier !== "string" || body.verifier.length < 40 || body.verifier.length > 100) throw new HttpError(400, "Некорректный запрос.");
     const handoff = await (await database()).collection("handoffs").findOneAndDelete({ challenge: sha256(body.verifier), expiresAt: { $gt: new Date() } });

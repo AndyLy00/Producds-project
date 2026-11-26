@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useKeyboard } from "../mobile";
 import { useCloudSync, type FamilyInvite, type Member } from "../cloud-sync";
+import { startPush } from "../push";
 import { allowBrowserNotifications, allowReminders, notifyNow, exactAlarmsAllowed, isNativeApp, onNotificationOpened, openExactAlarmSettings, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
 import { forgetPhotosExcept, newPhotoId, savePhoto, shrinkPhoto } from "../photos";
 import {
@@ -197,6 +198,15 @@ export function useShoppingApp() {
   useEffect(() => {
     if (ready) updateWidget(activeLists[0]);
   }, [ready, activeLists]);
+  // Push notifications for family news (src/push.ts), on phones signed in to an account.
+  useEffect(() => {
+    if (!ready || !me) return;
+    void startPush(
+      (token) => cloudRef.current.account.registerPush(token),
+      (listId) => { setSheet(null); setCooking(null); setTab("lists"); setCurrentListId(listId); },
+    );
+  }, [ready, me]);
+
   useEffect(() => onNotificationOpened(
     (listId) => { setSheet(null); setCooking(null); setTab("lists"); setCurrentListId(listId); },
     (recipeId, stepId) => {

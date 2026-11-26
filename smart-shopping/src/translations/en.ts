@@ -485,6 +485,7 @@ const en: Record<string, string> = {
   "Никто не назначен": "Nobody is assigned",
   "Вы идёте в магазин": "You are going shopping",
   "{name} получит список": "{name} will get the list",
+  "Кого отправили в магазин и когда покупки сделаны": "Who is sent shopping and when the shopping is done",
 };
 
 export default en;

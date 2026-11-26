@@ -56,6 +56,23 @@ jobs:
 
       - run: npm run check:runtime
 
+      # Push notifications (src/push.ts) need the Firebase project's google-services.json, kept in
+      # the secret GOOGLE_SERVICES_JSON (the file itself, or the file in base64). Without it the
+      # app is built without push notifications.
+      - name: Add the Firebase configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::notice::Secret GOOGLE_SERVICES_JSON is not set: no push notifications in this build"
+            exit 0
+          fi
+          case "$GOOGLE_SERVICES_JSON" in
+            "{"*) printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json ;;
+            *) printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json ;;
+          esac
+          echo "PUSH_ENABLED=1" >> "$GITHUB_ENV"
+
       - name: Build the web bundle and sync it into the Android project
         env:
           ADMOB_BANNER_ID: ${{ inputs.test_ads && vars.ADMOB_BANNER_ID || '' }}

@@ -3,6 +3,11 @@
 // X-Lang header; anything else gets Russian.
 
 export const serverTexts = {
+  // Push notifications (api/_news.js).
+  "Вас просят сходить в магазин": { en: "You are asked to go shopping", ro: "Sunteți rugat să mergeți la magazin" },
+  "{name}: «{list}», осталось купить {left}": { en: "{name}: “{list}”, {left} left to buy", ro: "{name}: „{list}”, mai sunt de cumpărat {left}" },
+  "Покупки сделаны": { en: "Shopping done", ro: "Cumpărăturile sunt făcute" },
+  "{name} купил(а) всё по списку «{list}»": { en: "{name} bought everything on “{list}”", ro: "{name} a cumpărat tot din lista „{list}”" },
   "Вход не завершён. Попробуйте ещё раз.": { en: "Sign-in was not completed. Please try again.", ro: "Autentificarea nu s-a încheiat. Încercați din nou." },
   "Код устарел. Запросите новый.": { en: "The code has expired. Ask for a new one.", ro: "Codul a expirat. Cereți unul nou." },
   "Неверный код.": { en: "Wrong code.", ro: "Cod greșit." },

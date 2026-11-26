@@ -8,6 +8,7 @@ import { API_ORIGIN } from "./api-origin";
 import { uploadPendingPhotos } from "./photos";
 import { isDemoList, mergeData, profileOf, type ShoppingData, type ShoppingList, type Profile, type Sharing } from "./model";
 import { language, t } from "./i18n";
+import { forgetPushToken, savedPushToken } from "./push";
 
 const SESSION_KEY = "smart-shopping.account.v2";
 const VERIFIER_KEY = "smart-shopping.google-verifier";
@@ -218,6 +219,10 @@ export function useCloudSync(
   }, []);
 
   const signOut = useCallback(() => {
+    // The phone stops getting this account's push notifications (src/push.ts).
+    const pushToken = savedPushToken();
+    if (pushToken) void api("/api/auth", { action: "push-unregister", token: pushToken }).catch(() => undefined);
+    forgetPushToken();
     updateSession(null);
     setStatus("idle");
     setData((previous) => ({ ...previous, sharing: {} }));
@@ -265,6 +270,8 @@ export function useCloudSync(
       return next;
     },
     signOut,
+    // The phone's push token (src/push.ts); resolves to whether the server sends pushes.
+    registerPush: async (token: string) => (await authed<{ push: boolean }>({ action: "push-register", token })).push,
   };
 
   // The family's lists are all shared (api/_family.js). Joining or leaving changes which lists

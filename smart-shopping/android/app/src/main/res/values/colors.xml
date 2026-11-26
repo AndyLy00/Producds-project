@@ -2,4 +2,6 @@
 <resources>
     <!-- Matches the app's paper background (see src/prototype.css). -->
     <color name="appBackground">#faf7ee</color>
+    <!-- Accent of notifications (AndroidManifest.xml, capacitor.config.ts). -->
+    <color name="notification_green">#2f603c</color>
 </resources>

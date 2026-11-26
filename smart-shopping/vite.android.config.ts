@@ -56,6 +56,8 @@ export default defineConfig({
     // AdMob banner (src/ads.ts); without an ad unit id there are no ads.
     __ADMOB_BANNER_ID__: JSON.stringify(process.env.ADMOB_BANNER_ID ?? ""),
     __ADMOB_TESTING__: JSON.stringify(process.env.ADMOB_TESTING === "1"),
+    // Push notifications (src/push.ts): only builds with the Firebase project's google-services.json.
+    __PUSH_ENABLED__: JSON.stringify(process.env.PUSH_ENABLED === "1"),
   },
   build: { outDir: "dist/android", emptyOutDir: true },
   resolve: {

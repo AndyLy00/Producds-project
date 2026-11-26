@@ -485,6 +485,7 @@ const ro: Record<string, string> = {
   "Никто не назначен": "Nu este desemnat nimeni",
   "Вы идёте в магазин": "Mergeți la cumpărături",
   "{name} получит список": "{name} va primi lista",
+  "Кого отправили в магазин и когда покупки сделаны": "Cine a fost trimis la magazin și când cumpărăturile sunt făcute",
 };
 
 export default ro;

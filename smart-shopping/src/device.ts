@@ -5,6 +5,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
 import { alive, progress, repeatTimes, type ShoppingList } from "./model";
 import { t } from "./i18n";
+import { pushActive } from "./push";
 
 export const isNativeApp = Capacitor.isNativePlatform();
 
@@ -210,7 +211,8 @@ const NEWS_IDS = 2_110_000_000;
 // A notification right away, for news that came with a sync while the app is in the background;
 // in front of the user the app shows it itself.
 export async function notifyNow(key: string, title: string, body: string, listId: string) {
-  if (document.visibilityState === "visible") return;
+  // The server has sent it by push already (src/push.ts).
+  if (document.visibilityState === "visible" || pushActive()) return;
   if (!isNativeApp) {
     if ("Notification" in window && Notification.permission === "granted") {
       try {

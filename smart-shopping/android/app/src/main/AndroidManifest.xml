@@ -8,6 +8,10 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="${admobAppId}" />
+        <!-- Push notifications (src/push.ts): icon, color and channel when the message names none. -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_basket" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notification_green" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="family" />
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"

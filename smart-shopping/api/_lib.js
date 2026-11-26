@@ -4,6 +4,7 @@ import { createHash, createHmac, randomBytes, randomInt, scrypt, timingSafeEqual
 import { promisify } from "node:util";
 import { MongoClient } from "mongodb";
 import { languageOf, tr } from "./_i18n.js";
+import { DEVICE_LIFETIME_DAYS } from "./_push.js";
 
 const scryptAsync = promisify(scrypt);
 const TOKEN_LIFETIME_SECONDS = 180 * 24 * 60 * 60;
@@ -86,6 +87,9 @@ export async function database() {
     db.collection("invites").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("handoffs").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("handoffs").createIndex({ challenge: 1 }),
+    // Push tokens of the Android app (api/_push.js); a phone not seen for months is forgotten.
+    db.collection("devices").createIndex({ userId: 1, updatedAt: -1 }),
+    db.collection("devices").createIndex({ updatedAt: 1 }, { expireAfterSeconds: DEVICE_LIFETIME_DAYS * 86_400 }),
     db.collection("lists").createIndex({ members: 1, serverUpdatedAt: 1 }),
     db.collection("photos").createIndex({ owner: 1, createdAt: 1 }),
     // Unique over the array's values: an account can be in one family only.

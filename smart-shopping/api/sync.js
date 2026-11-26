@@ -9,6 +9,7 @@
 import { HttpError, authenticate, database, json, preflight, readJson, route } from "./_lib.js";
 import { cleanList, cleanProfile, emptyProfile } from "./_clean.js";
 import { removeUnusedPhotos } from "./_photos.js";
+import { familyNews, sendFamilyNews } from "./_news.js";
 import { accessFilter, canOpen, familyMembers, sharingOf } from "./_family.js";
 import { mergeList, mergeProfile, pruneList, pruneProfile } from "../shared/merge.js";
 
@@ -69,15 +70,20 @@ export const POST = route(async (request) => {
   const stored = await lists.find({ _id: { $in: [...known] } }, { projection: { members: 1, "data.personal": 1 } }).toArray();
   const revoked = stored.filter((list) => !canOpen(list, user._id, family)).map((list) => list._id);
 
+  // What the lists said before this sync, to notice news for the family (api/_news.js).
+  const before = new Map((await lists.find({ _id: { $in: incoming.map((list) => list.id) } }, { projection: { "data.shopper": 1, "data.completedAt": 1 } }).toArray()).map((list) => [list._id, list.data]));
+  const news = [];
   for (const list of incoming) {
     if (revoked.includes(list.id)) continue;
-    await saveMerged(lists, { _id: list.id, ...access }, list, mergeStoredList, {
+    const saved = await saveMerged(lists, { _id: list.id, ...access }, list, mergeStoredList, {
       _id: list.id,
       ownerId: user._id,
       members: [user._id],
       data: pruneList(list),
     });
+    if (saved) news.push(...familyNews(before.get(list.id), saved, user.email));
   }
+  if (news.length) await sendFamilyNews(db, news);
 
   const profiles = db.collection("profiles");
   const incomingProfile = cleanProfile(body.profile);
