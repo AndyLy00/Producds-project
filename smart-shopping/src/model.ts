@@ -31,6 +31,9 @@ export type Product = { name: string; quantity: string; unit: string; category: 
 export type ShoppingItem = Product & {
   id: string;
   purchased: boolean;
+  // Who of the family added the product and who bought it (emails), for lists kept together.
+  addedBy?: string;
+  purchasedBy?: string;
   favorite: boolean;
   order: number;
   updatedAt: number;
@@ -47,11 +50,30 @@ export type ShoppingList = {
   sortMode: "category" | "manual";
   remindAt?: number;
   repeat?: Repeat;
+  // Who goes to the store with the list, and who sent them (emails); `at` is when.
+  shopper?: Shopper;
+  // Who moved the list to the history.
+  completedBy?: string;
   // Hidden from the family (api/_family.js): only the list's own members see it.
   personal?: boolean;
   deleted?: boolean;
   items: ShoppingItem[];
 };
+
+export type Shopper = { email: string; by: string; at: number };
+
+// How a family member is named in the app: the part of the email before "@".
+export function personName(email: string) {
+  return email.split("@")[0] || email;
+}
+
+// A list's new products get the name of whoever added them.
+export function stampNewItems(before: ShoppingList, after: ShoppingList, email: string | null): ShoppingList {
+  if (!email) return after;
+  const known = new Set(before.items.map((item) => item.id));
+  if (after.items.every((item) => known.has(item.id) || item.addedBy)) return after;
+  return { ...after, items: after.items.map((item) => (known.has(item.id) || item.addedBy ? item : { ...item, addedBy: email })) };
+}
 
 // A reminder that comes back at `time` ("HH:MM"): every day, on the given weekdays (0 is Sunday)
 // or on the given day of the month (1–31; a shorter month uses its last day).

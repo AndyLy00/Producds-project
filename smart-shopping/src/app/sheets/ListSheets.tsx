@@ -1,8 +1,10 @@
 // Sheets about one list and its products.
 import {
   ArchiveIcon,
+  BackpackIcon,
   BellIcon,
   BookmarkIcon,
+  CheckIcon,
   ChevronRightIcon,
   CopyIcon,
   Cross2Icon,
@@ -22,7 +24,7 @@ import {
 import { useState, type ReactNode } from "react";
 import { KeyboardInput } from "../../mobile";
 import { shareText } from "../../device";
-import { addProducts, alive, formatReminder, formatRepeat, guessCategory, newList, progress, units, weekdayName, weekdays, type Repeat, type Template } from "../../model";
+import { addProducts, alive, formatReminder, formatRepeat, guessCategory, newList, personName, progress, units, weekdayName, weekdays, type Repeat, type Template } from "../../model";
 import { at, nextWeekday, toLocalInput } from "../types";
 import { Field, FormError, keepFocus, SheetClose, type SheetProps as Props } from "../ui";
 import { formatLei, usePrices } from "../usePrices";
@@ -102,6 +104,7 @@ export function ListActionsSheet({ app }: Props<"actions">) {
         </button>
       )}
       {action(<Share1Icon />, t("Отправить текстом"), () => void app.sendAsText(list), t("В мессенджер или заметки"))}
+      {inFamily && !list.personal && action(<BackpackIcon />, t("Кто идёт в магазин"), () => app.openSheet({ kind: "shopper", listId: list.id }), list.shopper ? personLabel(app, list.shopper.email) : t("Отправить кого-то со списком"))}
       {action(<BellIcon />, t("Напоминание"), () => { app.setReminderValue(toLocalInput(list.remindAt ?? at(1, 10))); app.openSheet({ kind: "reminder", listId: list.id }); }, [list.remindAt && list.remindAt > Date.now() ? formatReminder(list.remindAt) : "", list.repeat ? formatRepeat(list.repeat) : ""].filter(Boolean).join(" · ") || t("Не задано"))}
       {action(<MixIcon />, t("Магазин"), () => app.openSheet({ kind: "store-pick", listId: list.id }), app.storeName(list) ?? t("Не выбран"))}
       {action(<BookmarkIcon />, t("Сохранить как шаблон"), () => app.saveAsTemplate(list))}
@@ -216,6 +219,36 @@ export function ReminderSheet({ app }: Props<"reminder">) {
         {mode === "repeat" && list.repeat && <button type="button" className="destructive-button" onClick={() => app.setRepeat(list.id, undefined)}>{t("Не повторять")}</button>}
       </div>
     </form>
+  );
+}
+
+// "You" for the user, the name before "@" for the others.
+function personLabel(app: Props<"shopper">["app"], email: string) {
+  return email === app.cloud.email?.toLowerCase() ? t("Вы") : personName(email);
+}
+
+export function ShopperSheet({ app }: Props<"shopper">) {
+  const list = app.sheetList;
+  if (!list) return null;
+  const members = app.cloud.family?.members ?? [];
+  // The user first, then the others.
+  const people = [...members].sort((a, b) => Number(b.you) - Number(a.you));
+  const current = list.shopper?.email;
+  return (
+    <div className="sheet-form action-list">
+      <SheetClose app={app} />
+      {people.map((member) => {
+        const email = member.email.toLowerCase();
+        return (
+          <button type="button" key={email} className={`setting-row action-row ${current === email ? "action-current" : ""}`} onClick={() => app.sendShopper(list.id, email)}>
+            <span className="setting-icon">{current === email ? <CheckIcon /> : <PersonIcon />}</span>
+            <span><b>{member.you ? t("Я схожу сам") : personName(email)}</b><small>{member.you ? email : t("Отправить список: {email}", { email })}</small></span>
+            <ChevronRightIcon />
+          </button>
+        );
+      })}
+      {current && <button type="button" className="destructive-button" onClick={() => app.sendShopper(list.id, null)}>{t("Никто не идёт")}</button>}
+    </div>
   );
 }
 

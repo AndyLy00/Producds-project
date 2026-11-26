@@ -1,7 +1,7 @@
 // Small building blocks shared by the screens and sheets.
-import { BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIcon, PersonIcon, PlusIcon, StarFilledIcon, StarIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { BackpackIcon, BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIcon, PersonIcon, PlusIcon, StarFilledIcon, StarIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { useState, type PointerEvent, type ReactNode } from "react";
-import { formatReminder, nextReminder, productImage, type ShoppingItem, type ShoppingList } from "../model";
+import { formatReminder, nextReminder, personName, productImage, type ShoppingItem, type ShoppingList } from "../model";
 import { usePhoto } from "../photos";
 import { formatLei } from "./usePrices";
 import type { DragHandle } from "../sortable";
@@ -13,13 +13,14 @@ import { t } from "../i18n";
 export type SheetProps<K extends Sheet["kind"]> = { app: ShoppingApp; sheet: SheetOf<K> };
 
 // `cost`: what the item would cost at Linella, in bani (src/app/usePrices.ts).
-export function ProductRow({ item, handle, onToggle, onEdit, onFavorite, cost }: { item: ShoppingItem; handle?: DragHandle; onToggle: () => void; onEdit: () => void; onFavorite: () => void; cost?: number }) {
+// `who`: who of the family added or bought the item, when it is worth saying (src/app/ListScreen.tsx).
+export function ProductRow({ item, handle, onToggle, onEdit, onFavorite, cost, who }: { item: ShoppingItem; handle?: DragHandle; onToggle: () => void; onEdit: () => void; onFavorite: () => void; cost?: number; who?: string }) {
   const image = productImage(item.name);
   return <div className={`product-row ${item.purchased ? "product-row-done" : ""}`}>
     {handle && <span className="drag-handle" aria-label={t("Перетащить {name}", { name: item.name })} {...handle}><DragHandleDots2Icon /></span>}
     <button className={`check-button ${item.purchased ? "checked" : ""}`} onClick={onToggle} aria-label={item.purchased ? t("Вернуть {name} в список", { name: item.name }) : t("Отметить {name} купленным", { name: item.name })}>{item.purchased && <CheckIcon />}</button>
     {image ? <img className="product-art" src={image} alt="" /> : <span className="product-art product-art-placeholder" aria-hidden="true">{item.name.slice(0, 1).toLocaleUpperCase("ru")}</span>}
-    <button className="product-main" onClick={onEdit}><span className="product-name">{item.name}</span><small className="product-note">{[t(item.category), item.note].filter(Boolean).join(" · ")}</small></button>
+    <button className="product-main" onClick={onEdit}><span className="product-name">{item.name}</span><small className="product-note">{[t(item.category), item.note].filter(Boolean).join(" · ")}</small>{who && <small className="product-who">{who}</small>}</button>
     <span className="product-quantity">{item.quantity} {t(item.unit)}{cost !== undefined && <small className="product-price">≈ {formatLei(cost)}</small>}</span>
     <button className={`favorite-button ${item.favorite ? "favorite-active" : ""}`} onClick={onFavorite} aria-label={item.favorite ? t("Убрать из избранного") : t("В избранное")}>{item.favorite ? <StarFilledIcon /> : <StarIcon />}</button>
   </div>;
@@ -40,9 +41,13 @@ export function ListBadges({ app, list }: { app: ShoppingApp; list: ShoppingList
   // A repeating reminder shows when it comes next; a past one-time reminder stays, marked.
   const next = nextReminder(list);
   const shown = next ?? (list.remindAt && !list.completedAt ? list.remindAt : undefined);
-  if (!sharing && !store && !shown) return null;
+  // Who goes to the store; only while the list is still to be bought.
+  const shopper = list.shopper && !list.completedAt ? list.shopper.email : undefined;
+  const mine = shopper !== undefined && shopper === app.cloud.email?.toLowerCase();
+  if (!sharing && !store && !shown && !shopper) return null;
   return (
     <span className="list-badges">
+      {shopper && <span className={`badge ${mine ? "badge-shopper" : ""}`}><BackpackIcon /> {mine ? t("Идёте вы") : t("Идёт: {name}", { name: personName(shopper) })}</span>}
       {sharing && <span className="badge"><PersonIcon /> {sharing.members}</span>}
       {store && <span className="badge"><MixIcon /> {store}</span>}
       {shown && <span className={`badge ${shown < Date.now() ? "badge-alert" : ""}`}>{list.repeat ? <UpdateIcon /> : <BellIcon />} {formatReminder(shown)}</span>}

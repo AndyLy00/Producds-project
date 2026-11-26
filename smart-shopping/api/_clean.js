@@ -47,6 +47,8 @@ export function cleanItem(value) {
     id: value.id,
     ...product(value),
     purchased: value.purchased === true,
+    ...(email(value.addedBy) ? { addedBy: email(value.addedBy) } : {}),
+    ...(value.purchased === true && email(value.purchasedBy) ? { purchasedBy: email(value.purchasedBy) } : {}),
     favorite: value.favorite === true,
     order: Number.isFinite(value.order) ? value.order : 0,
     updatedAt: stamp(value.updatedAt),
@@ -68,9 +70,22 @@ export function cleanList(value) {
     ...(value.personal === true ? { personal: true } : {}),
     ...(value.remindAt ? { remindAt: time(value.remindAt) } : {}),
     ...(cleanRepeat(value.repeat) ? { repeat: cleanRepeat(value.repeat) } : {}),
+    ...(cleanShopper(value.shopper) ? { shopper: cleanShopper(value.shopper) } : {}),
+    ...(value.completedAt && email(value.completedBy) ? { completedBy: email(value.completedBy) } : {}),
     ...tombstone(value),
     items: entities(value.items, 1000, cleanItem),
   };
+}
+
+// Who goes to the store with a list (src/model.ts, Shopper), or null.
+function cleanShopper(value) {
+  if (!value || typeof value !== "object" || !email(value.email) || !email(value.by)) return null;
+  return { email: email(value.email), by: email(value.by), at: stamp(value.at) };
+}
+
+// A family member's address as the app shows it; only a label, so just its shape is checked.
+function email(value) {
+  return typeof value === "string" && value.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(value) ? value.toLowerCase() : "";
 }
 
 // A repeating reminder (src/model.ts, Repeat), or null when it is not a valid one.

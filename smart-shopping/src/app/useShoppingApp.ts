@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useKeyboard } from "../mobile";
 import { useCloudSync, type FamilyInvite, type Member } from "../cloud-sync";
-import { allowBrowserNotifications, allowReminders, exactAlarmsAllowed, isNativeApp, onNotificationOpened, openExactAlarmSettings, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
+import { allowBrowserNotifications, allowReminders, notifyNow, exactAlarmsAllowed, isNativeApp, onNotificationOpened, openExactAlarmSettings, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
 import { forgetPhotosExcept, newPhotoId, savePhoto, shrinkPhoto } from "../photos";
 import {
   addProducts,
@@ -14,6 +14,8 @@ import {
   emptyData,
   formatReminder,
   formatRepeat,
+  personName,
+  stampNewItems,
   guessCategory,
   guessMinutes,
   listAsText,
@@ -42,6 +44,27 @@ import { useTimers } from "./useTimers";
 import { language, setLanguage, t, type Language } from "../i18n";
 
 export type ShoppingApp = ReturnType<typeof useShoppingApp>;
+
+// Family news is told only while it is this fresh, so a new device does not replay old news.
+const FAMILY_NEWS_AGE = 24 * 3_600_000;
+const SEEN_KEY = "smart-shopping.family-news";
+
+function readSeen(): string[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSeen(keys: string[]) {
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify(keys.slice(-200)));
+  } catch {
+    // Without storage the news may be told again; harmless.
+  }
+}
 
 export function useShoppingApp() {
   const [data, setData] = useState<ShoppingData>(emptyData);
@@ -76,6 +99,8 @@ export function useShoppingApp() {
   const keyboard = useKeyboard();
   const notify = useCallback((text: string) => setToast({ text }), []);
   const cloud = useCloudSync(data, setData, ready, notify);
+  // The signed-in account, lower-case as the server keeps it; null without an account.
+  const me = cloud.email?.toLowerCase() ?? null;
   const cloudRef = useRef(cloud);
   cloudRef.current = cloud;
   const timers = useTimers((timer) => setToast({ text: t("Готово: {label}", { label: timer.label }) }));
@@ -130,10 +155,39 @@ export function useShoppingApp() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const activeLists = useMemo(() => alive(data.lists).filter((list) => !list.completedAt).sort((a, b) => b.createdAt - a.createdAt), [data.lists]);
+  // A list the user has been sent to the store with comes first.
+  const activeLists = useMemo(() => {
+    const mine = (list: ShoppingList) => (list.shopper?.email === me ? 1 : 0);
+    return alive(data.lists).filter((list) => !list.completedAt).sort((a, b) => mine(b) - mine(a) || b.createdAt - a.createdAt);
+  }, [data.lists, me]);
   const history = useMemo(() => alive(data.lists).filter((list) => list.completedAt).sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)), [data.lists]);
   const categories = categoryNames(data);
   const currentList = activeLists.find((list) => list.id === currentListId) ?? null;
+
+  // Family news that arrived with a sync: being sent to the store, or the store run you asked for
+  // being done. Each is told once (remembered on the device) and only while it is fresh.
+  useEffect(() => {
+    if (!ready || !me) return;
+    const seen = readSeen();
+    const fresh = Date.now() - FAMILY_NEWS_AGE;
+    const news: { key: string; title: string; body: string; listId: string }[] = [];
+    for (const list of alive(data.lists)) {
+      const { shopper } = list;
+      if (shopper && !list.completedAt && shopper.email === me && shopper.by !== me && shopper.at > fresh) {
+        news.push({ key: `sent:${list.id}:${shopper.at}`, title: t("Вас просят сходить в магазин"), body: t("{name}: «{list}», осталось купить {left}", { name: personName(shopper.by), list: list.name, left: progress(list).left }), listId: list.id });
+      }
+      if (shopper?.by === me && list.completedAt && list.completedBy && list.completedBy !== me && list.completedAt > fresh) {
+        news.push({ key: `done:${list.id}:${list.completedAt}`, title: t("Покупки сделаны"), body: t("{name} купил(а) всё по списку «{list}»", { name: personName(list.completedBy), list: list.name }), listId: list.id });
+      }
+    }
+    const unseen = news.filter((entry) => !seen.includes(entry.key));
+    if (!unseen.length) return;
+    writeSeen([...seen, ...unseen.map((entry) => entry.key)]);
+    for (const entry of unseen) {
+      notify(`${entry.title}. ${entry.body}`);
+      void notifyNow(entry.key, entry.title, entry.body, entry.listId);
+    }
+  }, [ready, me, data.lists, notify]);
 
   // Reminders and the home-screen widget follow the data.
   const reminderKey = JSON.stringify(activeLists.map((list) => [list.id, list.remindAt, list.repeat, list.name, progress(list).left]));
@@ -253,11 +307,28 @@ export function useShoppingApp() {
   }
 
   function editList(listId: string, edit: (list: ShoppingList) => ShoppingList) {
-    change((previous) => ({ ...previous, lists: previous.lists.map((list) => (list.id === listId ? edit(list) : list)) }));
+    change((previous) => ({ ...previous, lists: previous.lists.map((list) => (list.id === listId ? stampNewItems(list, edit(list), me) : list)) }));
   }
 
   function patchList(listId: string, patch: Partial<ShoppingList>) {
     editList(listId, (list) => ({ ...list, ...patch, updatedAt: Date.now() }));
+  }
+
+  function togglePurchased(listId: string, item: ShoppingItem) {
+    const purchased = !item.purchased;
+    patchItem(listId, item.id, { purchased, purchasedBy: purchased && me ? me : undefined });
+  }
+
+  // Sends a family member (or the user) to the store with the list; null: nobody goes.
+  function sendShopper(listId: string, email: string | null) {
+    closeSheet();
+    if (!email || !me) {
+      patchList(listId, { shopper: undefined });
+      notify(t("Никто не назначен"));
+      return;
+    }
+    patchList(listId, { shopper: { email, by: me, at: Date.now() } });
+    notify(email === me ? t("Вы идёте в магазин") : t("{name} получит список", { name: personName(email) }));
   }
 
   function patchItem(listId: string, itemId: string, patch: Partial<ShoppingItem>) {
@@ -354,7 +425,7 @@ export function useShoppingApp() {
     setCurrentListId(null);
     undoable(t("Список перемещён в историю"), (previous) => ({
       ...previous,
-      lists: previous.lists.map((entry) => (entry.id === list.id ? { ...entry, completedAt: Date.now(), remindAt: undefined, updatedAt: Date.now() } : entry)),
+      lists: previous.lists.map((entry) => (entry.id === list.id ? { ...entry, completedAt: Date.now(), ...(me ? { completedBy: me } : {}), remindAt: undefined, updatedAt: Date.now() } : entry)),
     }));
   }
 
@@ -779,7 +850,7 @@ export function useShoppingApp() {
     // Derived
     activeLists, history, categories, currentList, favorites, storeName, sheetList, hints, cooking, cookingRecipe, timers, exactAlarms,
     // Actions
-    notify, undo, patchList, patchItem, removeEntity, toggleDarkMode, openSheet, closeSheet,
+    notify, undo, patchList, patchItem, togglePurchased, sendShopper, removeEntity, toggleDarkMode, openSheet, closeSheet,
     openList, closeList: () => setCurrentListId(null), startNewList, addList, addListWithReminder, submitListName, deleteList, completeList, repeatList, saveAsTemplate, sendAsText,
     openProductSheet, saveProduct, addQuick, quickAdd, deleteProduct, clearPurchased, toggleSortMode, reorder, addProductsTo, addToSomeList,
     openRecipe, saveRecipe, editStep, addStep, removeStep, moveStep, pickRecipePhoto, removeRecipePhoto,

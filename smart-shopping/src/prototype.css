@@ -170,6 +170,7 @@
 .product-main { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding: 8px 0; border: 0; background: transparent; color: var(--ink); text-align: left; }
 .product-name { overflow: hidden; max-width: 100%; font-size: 15px; font-weight: 660; letter-spacing: -0.25px; text-overflow: ellipsis; white-space: nowrap; }
 .product-note { overflow: hidden; max-width: 100%; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.product-who { overflow: hidden; max-width: 100%; color: var(--green); font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .product-quantity { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 550; white-space: nowrap; }
 .favorite-button { display: grid; width: 28px; height: 32px; flex: 0 0 auto; place-items: center; border: 0; background: transparent; color: #a9a48e; }
 .favorite-button svg { width: 14px; height: 14px; }
@@ -234,6 +235,10 @@
 .create-list-button small { color: var(--muted); font-size: 10px; }
 .create-list-button > svg { width: 15px; height: 15px; color: var(--muted); }
 .home-tip { display: flex; align-items: flex-start; gap: 9px; margin-top: 21px; padding: 13px; border-radius: 14px; background: var(--green-soft); }
+.shopper-note { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 12px 13px; border-radius: 14px; background: var(--green-soft); color: var(--ink); }
+.shopper-note svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--green); }
+.shopper-note p { margin: 0; font-size: 12px; line-height: 1.45; }
+.action-current { border-color: var(--green); }
 .tip-mark { display: grid; width: 16px; height: 16px; flex: 0 0 auto; place-items: center; color: var(--green); }
 .tip-mark svg { width: 13px; height: 13px; }
 .home-tip p { margin: 0; color: var(--ink); font-size: 11px; line-height: 1.45; }
@@ -335,6 +340,7 @@
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 10px; font-weight: 650; white-space: nowrap; }
 .badge svg { width: 11px; height: 11px; }
 .badge-alert { background: color-mix(in srgb, var(--tomato) 15%, transparent); color: var(--tomato); }
+.badge-shopper { background: var(--green); color: var(--white); }
 .sort-chip-active { border-color: var(--green); background: var(--green-soft); }
 .complete-button { width: 100%; margin-top: 16px; }
 .drag-handle { display: grid; width: 22px; height: 40px; flex: 0 0 auto; place-items: center; color: var(--muted); cursor: grab; user-select: none; }

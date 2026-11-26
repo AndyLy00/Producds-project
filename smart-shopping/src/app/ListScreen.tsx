@@ -1,7 +1,7 @@
 // One open shopping list: products to buy, bought products and the quick-add bar.
 import { ArchiveIcon, ArrowLeftIcon, BackpackIcon, CheckIcon, ChevronDownIcon, DotsHorizontalIcon, MagnifyingGlassIcon, Pencil1Icon, PlusIcon, Share1Icon, TrashIcon } from "@radix-ui/react-icons";
 import { KeyboardInput, MobileScroll } from "../mobile";
-import { alive, progress, sortItems, type ShoppingItem, type ShoppingList } from "../model";
+import { alive, personName, progress, sortItems, type ShoppingItem, type ShoppingList } from "../model";
 import { Sortable, type DragHandle } from "../sortable";
 import { ListBadges, ProductRow } from "./ui";
 import { formatLei, itemCost, usePrices } from "./usePrices";
@@ -22,15 +22,26 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
   const costs = new Map(items.map((item) => [item.id, itemCost(item, prices[item.name.trim()])]));
   const sum = (entries: ShoppingItem[]) => entries.reduce((total, item) => total + (costs.get(item.id) ?? 0), 0);
   const priced = items.some((item) => costs.get(item.id) !== undefined);
+  // In a list kept together, products show who bought them, or who added them when it was not
+  // the user.
+  const me = app.cloud.email?.toLowerCase() ?? null;
+  const together = Boolean(data.sharing[list.id]);
+  const whoOf = (item: ShoppingItem) => {
+    if (item.purchased && item.purchasedBy) return item.purchasedBy === me ? t("купили вы") : t("купил(а) {name}", { name: personName(item.purchasedBy) });
+    if (!item.purchased && item.addedBy && item.addedBy !== me) return t("добавил(а) {name}", { name: personName(item.addedBy) });
+    return undefined;
+  };
+  const shopper = list.shopper;
 
   const productRow = (item: ShoppingItem, handle?: DragHandle) => (
     <ProductRow
       item={item}
       handle={handle}
-      onToggle={() => app.patchItem(list.id, item.id, { purchased: !item.purchased })}
+      onToggle={() => app.togglePurchased(list.id, item)}
       onEdit={() => app.openProductSheet(item)}
       onFavorite={() => app.patchItem(list.id, item.id, { favorite: !item.favorite })}
       cost={costs.get(item.id)}
+      who={together ? whoOf(item) : undefined}
     />
   );
 
@@ -55,6 +66,12 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
             <button className="icon-button" aria-label={t("Отправить список")} onClick={() => void app.sendAsText(list)}><Share1Icon /></button>
           </div>
           <ListBadges app={app} list={list} />
+          {shopper && shopper.email === me && shopper.by !== me && (
+            <section className="shopper-note">
+              <BackpackIcon />
+              <p>{t("{name} просит вас купить эти продукты. Когда всё купите, нажмите «Завершить список» — {name} получит уведомление.", { name: personName(shopper.by) })}</p>
+            </section>
+          )}
 
           <section className="progress-block" aria-label={t("Прогресс покупок")}>
             <div className="progress-copy"><span>{t("{bought} из {total} куплено", { bought, total })}</span><span>{Math.round(percent)}%</span></div>

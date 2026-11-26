@@ -203,6 +203,36 @@ export function ringTimer() {
   }
 }
 
+// --- Family news -------------------------------------------------------------------------------
+// Ids above the timers' range (timers use up to TIMER_IDS + 100 000 000), below 2^31.
+const NEWS_IDS = 2_110_000_000;
+
+// A notification right away, for news that came with a sync while the app is in the background;
+// in front of the user the app shows it itself.
+export async function notifyNow(key: string, title: string, body: string, listId: string) {
+  if (document.visibilityState === "visible") return;
+  if (!isNativeApp) {
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, { body });
+      } catch {
+        // Some mobile browsers only allow notifications from a service worker.
+      }
+    }
+    return;
+  }
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    let hash = 0;
+    for (const char of key) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
+    await LocalNotifications.schedule({
+      notifications: [{ id: NEWS_IDS + (Math.abs(hash) % 30_000_000) + 1, title, body, schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true }, extra: { listId } }],
+    });
+  } catch (error) {
+    console.warn("Notifications are not available", error);
+  }
+}
+
 // The browser asks once; the answer is remembered by the browser.
 export function allowBrowserNotifications() {
   if (!isNativeApp && "Notification" in window && Notification.permission === "default") void Notification.requestPermission().catch(() => undefined);

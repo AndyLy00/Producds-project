@@ -10,6 +10,7 @@ export type Sheet =
   | { kind: "actions"; listId: string }
   | { kind: "share"; listId: string }
   | { kind: "reminder"; listId: string }
+  | { kind: "shopper"; listId: string }
   | { kind: "store-pick"; listId: string }
   | { kind: "pick-list"; title: string; products: Product[] }
   | { kind: "recipe"; recipeId?: string }

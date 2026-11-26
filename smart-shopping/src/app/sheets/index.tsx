@@ -4,7 +4,7 @@ import type { ShoppingApp } from "../useShoppingApp";
 import { AccountSheet, DeleteAccountSheet, PasswordSheet } from "./AccountSheets";
 import { FamilyJoinSheet, FamilySheet } from "./FamilySheets";
 import { LanguageSheet } from "./LanguageSheet";
-import { ListActionsSheet, ListNameSheet, PickListSheet, ProductSheet, ReminderSheet, ShareSheet, StorePickSheet } from "./ListSheets";
+import { ListActionsSheet, ListNameSheet, PickListSheet, ProductSheet, ReminderSheet, ShareSheet, ShopperSheet, StorePickSheet } from "./ListSheets";
 import { CategoriesSheet, RecipeSheet, StoreSheet } from "./ProfileSheets";
 import { t } from "../../i18n";
 
@@ -16,6 +16,7 @@ function sheetMeta(app: ShoppingApp): { title: string; description?: string } {
     case "actions": return { title: app.sheetList?.name ?? t("Список") };
     case "share": return { title: t("Вести список вместе"), description: t("Все участники видят изменения друг друга через несколько секунд.") };
     case "reminder": return { title: t("Напоминание"), description: t("Пришлём уведомление в выбранное время.") };
+    case "shopper": return { title: t("Кто идёт в магазин"), description: t("Список поднимется наверх у того, кого вы выберете, и придёт уведомление.") };
     case "store-pick": return { title: t("Магазин"), description: t("Продукты будут идти в порядке отделов этого магазина.") };
     case "pick-list": return { title: t("В какой список добавить?"), description: sheet.title };
     case "recipe": return { title: sheet.recipeId ? t("Рецепт") : t("Новый рецепт"), description: t("Ингредиенты — по одному в строке, например «Мука 500 г».") };
@@ -48,6 +49,7 @@ function SheetContent({ app }: { app: ShoppingApp }) {
     case "actions": return <ListActionsSheet app={app} sheet={sheet} />;
     case "share": return <ShareSheet app={app} sheet={sheet} />;
     case "reminder": return <ReminderSheet app={app} sheet={sheet} />;
+    case "shopper": return <ShopperSheet app={app} sheet={sheet} />;
     case "store-pick": return <StorePickSheet app={app} sheet={sheet} />;
     case "pick-list": return <PickListSheet app={app} sheet={sheet} />;
     case "recipe": return <RecipeSheet app={app} sheet={sheet} />;
