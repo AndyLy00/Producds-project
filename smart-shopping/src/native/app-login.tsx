@@ -20,8 +20,14 @@ export function AppLoginPage({ challenge }: { challenge: string }) {
         await renderGoogleButton(slot.current, config.googleClientId, (credential) => {
           api<{ code: string }>("/api/auth", { action: "google", credential, challenge }).then(
             ({ code }) => {
-              const link = `korzina://auth?code=${encodeURIComponent(code)}`;
-              setState({ status: "done", message: t("Готово! Возвращаемся в приложение…"), link });
+              // Chrome on Android follows an intent: link to the app more reliably than a custom
+              // scheme, but only after a tap: Google's answer arrives without one, so the redirect
+              // below is often ignored. The button, or simply going back to the app, finishes the
+              // sign-in (the app claims it itself, see cloud-sync.ts).
+              const query = `auth?code=${encodeURIComponent(code)}`;
+              const android = /Android/i.test(navigator.userAgent);
+              const link = android ? `intent://${query}#Intent;scheme=korzina;package=io.github.andyly00.korzina;end` : `korzina://${query}`;
+              setState({ status: "done", message: t("Готово! Нажмите «Открыть приложение» или просто вернитесь в «Корзину»."), link });
               window.location.href = link;
             },
             (error: Error) => setState({ status: "error", message: error.message }),

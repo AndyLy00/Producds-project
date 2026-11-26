@@ -374,7 +374,7 @@ const ro: Record<string, string> = {
   "Нет списков": "Nicio listă",
   "Google недоступен": "Google nu este disponibil",
   "Вход через Google пока не настроен.": "Autentificarea cu Google nu este configurată încă.",
-  "Готово! Возвращаемся в приложение…": "Gata! Revenim în aplicație…",
+  "Готово! Нажмите «Открыть приложение» или просто вернитесь в «Корзину».": "Gata! Atingeți „Deschideți aplicația” sau reveniți pur și simplu în Korzina.",
   "К": "K",
   "Вход в «Корзину»": "Autentificare în Korzina",
   "Войдите через Google, и приложение на телефоне откроется уже с вашим аккаунтом.": "Autentificați-vă cu Google, iar aplicația de pe telefon se va deschide cu contul dvs.",

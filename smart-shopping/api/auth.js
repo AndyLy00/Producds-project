@@ -225,6 +225,18 @@ const actions = {
     if (!user) throw new HttpError(400, "Вход не завершён. Попробуйте ещё раз.");
     return json(200, account(user));
   },
+
+  // The app came back from the browser without the korzina://auth link: Chrome does not open an
+  // app from a page the user has not tapped, and Google's answer reaches the page without a tap.
+  // The app then claims the sign-in with its verifier alone; only it knows the verifier.
+  async "google-handoff-claim"(request, body) {
+    if (typeof body.verifier !== "string" || body.verifier.length < 40 || body.verifier.length > 100) throw new HttpError(400, "Некорректный запрос.");
+    const handoff = await (await database()).collection("handoffs").findOneAndDelete({ challenge: sha256(body.verifier), expiresAt: { $gt: new Date() } });
+    if (!handoff) return json(200, { pending: true });
+    const user = await (await users()).findOne({ _id: handoff.userId });
+    if (!user) throw new HttpError(400, "Вход не завершён. Попробуйте ещё раз.");
+    return json(200, account(user));
+  },
 };
 
 export const OPTIONS = preflight;

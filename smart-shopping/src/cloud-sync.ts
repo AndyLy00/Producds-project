@@ -12,6 +12,8 @@ import { language, t } from "./i18n";
 const SESSION_KEY = "smart-shopping.account.v2";
 const VERIFIER_KEY = "smart-shopping.google-verifier";
 const PUSH_DELAY = 700;
+// The last step of the Android app's Google sign-in (account.finishAppGoogleLogin).
+let appLoginQueue: Promise<boolean> = Promise.resolve(false);
 const POLL_INTERVAL = 5000;
 
 type Session = { email: string; token: string; verified: boolean; hasPassword: boolean; since: number };
@@ -244,11 +246,23 @@ export function useCloudSync(
       localStorage.setItem(VERIFIER_KEY, verifier);
       window.location.assign(`${API_ORIGIN}/?app-login=${base64url(digest)}`);
     },
-    finishAppGoogleLogin: async (code: string) => {
-      const verifier = localStorage.getItem(VERIFIER_KEY);
-      if (!verifier) throw new ApiError(400, t("Вход не завершён. Попробуйте ещё раз."));
-      localStorage.removeItem(VERIFIER_KEY);
-      startSession(await api<AccountResponse>("/api/auth", { action: "google-handoff", code, verifier }));
+    // With the code from the korzina://auth link, or without it when the user simply comes back
+    // to the app: Chrome often does not follow that link (see api/auth.js, google-handoff-claim).
+    // Calls run one after another, so the link and the return to the app never both spend the
+    // one-time sign-in. Resolves to whether this call signed the user in.
+    finishAppGoogleLogin: (code?: string) => {
+      const run = async () => {
+        const verifier = localStorage.getItem(VERIFIER_KEY);
+        if (!verifier) return false;
+        const result = await api<AccountResponse | { pending: true }>("/api/auth", code ? { action: "google-handoff", code, verifier } : { action: "google-handoff-claim", verifier });
+        if ("pending" in result) return false;
+        localStorage.removeItem(VERIFIER_KEY);
+        startSession(result);
+        return true;
+      };
+      const next = appLoginQueue.catch(() => false).then(run);
+      appLoginQueue = next;
+      return next;
     },
     signOut,
   };

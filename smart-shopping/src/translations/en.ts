@@ -374,7 +374,7 @@ const en: Record<string, string> = {
   "Нет списков": "No lists",
   "Google недоступен": "Google is unavailable",
   "Вход через Google пока не настроен.": "Google sign-in is not set up yet.",
-  "Готово! Возвращаемся в приложение…": "Done! Returning to the app…",
+  "Готово! Нажмите «Открыть приложение» или просто вернитесь в «Корзину».": "Done! Tap “Open the app” or just go back to Korzina.",
   "К": "K",
   "Вход в «Корзину»": "Sign in to Korzina",
   "Войдите через Google, и приложение на телефоне откроется уже с вашим аккаунтом.": "Sign in with Google and the app on your phone will open with your account.",

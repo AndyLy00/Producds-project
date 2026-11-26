@@ -172,14 +172,29 @@ export function useShoppingApp() {
         if (invite) setPendingInvite({ kind: "list", token: invite });
         else if (familyInvite) setPendingInvite({ kind: "family", token: familyInvite });
         const code = url.protocol === "korzina:" && url.host === "auth" ? url.searchParams.get("code") : null;
-        if (code) {
-          cloudRef.current.account.finishAppGoogleLogin(code).then(() => { setSheet(null); notify(t("Вы вошли через Google")); }, (error) => notify(errorText(error)));
-        }
+        if (code) finishGoogleLogin(code);
       }
     };
+    // Google sign-in done in the browser: the browser may not follow the link back, so the
+    // sign-in is also claimed whenever the user returns to the app.
+    const finishGoogleLogin = (code?: string) => {
+      cloudRef.current.account.finishAppGoogleLogin(code).then(
+        (done) => {
+          if (!done) return;
+          setSheet(null);
+          notify(t("Вы вошли через Google"));
+        },
+        (error) => { if (code) notify(errorText(error)); },
+      );
+    };
+    const returned = () => { if (document.visibilityState === "visible") finishGoogleLogin(); };
     handle();
     window.addEventListener("app:url", handle);
-    return () => window.removeEventListener("app:url", handle);
+    document.addEventListener("visibilitychange", returned);
+    return () => {
+      window.removeEventListener("app:url", handle);
+      document.removeEventListener("visibilitychange", returned);
+    };
   }, [ready, notify]);
 
   useEffect(() => {

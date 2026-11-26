@@ -85,6 +85,7 @@ export async function database() {
     db.collection("codes").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("invites").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("handoffs").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("handoffs").createIndex({ challenge: 1 }),
     db.collection("lists").createIndex({ members: 1, serverUpdatedAt: 1 }),
     db.collection("photos").createIndex({ owner: 1, createdAt: 1 }),
     // Unique over the array's values: an account can be in one family only.

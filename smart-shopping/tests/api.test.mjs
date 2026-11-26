@@ -125,6 +125,22 @@ test("Google sign-in is refused until it is configured, and its one-time code ne
   assert.ok(token);
 });
 
+test("the app can claim its Google sign-in with the verifier when the return link was blocked", { skip }, async () => {
+  await register("claim@example.com");
+  const user = await db.collection("users").findOne({ email: "claim@example.com" });
+  const verifier = "c".repeat(43);
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  assert.deepEqual((await auth({ action: "google-handoff-claim", verifier })).body, { pending: true });
+  await db.collection("handoffs").insertOne({ _id: "claimed", userId: user._id, challenge, expiresAt: new Date(Date.now() + 60_000) });
+  assert.deepEqual((await auth({ action: "google-handoff-claim", verifier: "d".repeat(43) })).body, { pending: true });
+  const claimed = await auth({ action: "google-handoff-claim", verifier });
+  assert.equal(claimed.status, 200);
+  assert.equal(claimed.body.email, "claim@example.com");
+  // One use only: the link that arrives late finds nothing.
+  assert.equal((await auth({ action: "google-handoff", code: "claimed", verifier })).status, 400);
+  assert.deepEqual((await auth({ action: "google-handoff-claim", verifier })).body, { pending: true });
+});
+
 test("lists need a valid session", { skip }, async () => {
   assert.equal((await call(api.sync, { lists: [] })).status, 401);
   assert.equal((await call(api.sync, { lists: [] }, { token: "forged.token" })).status, 401);
