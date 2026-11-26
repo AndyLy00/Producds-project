@@ -7,4 +7,11 @@
     <string name="custom_url_scheme">io.github.andyly00.korzina</string>
     <string name="widget_description">What is left to buy in the first list</string>
     <string name="widget_empty">Open the app to show a list</string>
+    <string name="quick_add_title">Add to “%1$s”</string>
+    <string name="quick_add_title_new">Add to the shopping list</string>
+    <string name="quick_add_hint">For example: milk 2 l, bread</string>
+    <string name="quick_add_note">Several products: separate them with commas. They go into the list when you open the app.</string>
+    <string name="quick_add_button">Add</string>
+    <string name="quick_add_cancel">Cancel</string>
+    <string name="widget_add">Add a product</string>
 </resources>

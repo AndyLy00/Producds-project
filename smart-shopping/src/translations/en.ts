@@ -486,6 +486,8 @@ const en: Record<string, string> = {
   "Вы идёте в магазин": "You are going shopping",
   "{name} получит список": "{name} will get the list",
   "Кого отправили в магазин и когда покупки сделаны": "Who is sent shopping and when the shopping is done",
+  "Покупки": "Shopping",
+  "С виджета добавлено: {names}": "Added from the widget: {names}",
 };
 
 export default en;

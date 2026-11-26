@@ -412,6 +412,42 @@ export function parseProducts(text: string, categories: string[]): Product[] {
     });
 }
 
+// --- Home-screen widget ------------------------------------------------------------------------
+
+// What was typed in the widget's quick-add window (android QuickAddActivity.java).
+export type WidgetAddition = { listId: string; text: string; at: number };
+
+// Several products in one go: separated by new lines, ";" or ", " ("milk 2 l, bread"); a comma
+// inside a number ("1,5 кг") stays.
+export function splitProducts(text: string) {
+  return text.split(/\s*(?:\n|;|,\s)\s*/).map((line) => line.trim()).filter((line) => /[\p{L}\p{N}]/u.test(line));
+}
+
+// Puts the widget's products into their list: the one the widget showed, else the newest list
+// still to buy, else a new list named `newListName`. Returns the new data, the names added and
+// the list they went to.
+export function addWidgetProducts(data: ShoppingData, additions: WidgetAddition[], categories: string[], newListName: string, now = Date.now()) {
+  const added: string[] = [];
+  let lists = data.lists;
+  let targetId: string | undefined;
+  for (const addition of additions) {
+    const products = parseProducts(splitProducts(addition.text).join("\n"), categories);
+    if (!products.length) continue;
+    const open = alive(lists).filter((list) => !list.completedAt);
+    const target = open.find((list) => list.id === addition.listId) ?? [...open].sort((a, b) => b.createdAt - a.createdAt)[0];
+    if (target) {
+      lists = lists.map((list) => (list.id === target.id ? addProducts(list, products, now) : list));
+      targetId = target.id;
+    } else {
+      const created = addProducts(newList(newListName, now), products, now);
+      lists = [created, ...lists];
+      targetId = created.id;
+    }
+    added.push(...products.map((product) => product.name));
+  }
+  return { data: added.length ? { ...data, lists } : data, added, listId: targetId };
+}
+
 // --- Recipe steps ------------------------------------------------------------------------------
 
 const durationPattern = /(\d+(?:[.,]\d+)?)(?:\s*[-–—]\s*(\d+(?:[.,]\d+)?))?\s*(час(?:а|ов)?|ч\.?|мин(?:ут[ауы]?|\.)?|hours?|hrs?|h|minutes?|mins?|oră|ore|ora|minute|minut)(?![a-zа-яёăâîșț])/i;

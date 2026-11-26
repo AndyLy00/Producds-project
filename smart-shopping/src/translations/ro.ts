@@ -486,6 +486,8 @@ const ro: Record<string, string> = {
   "Вы идёте в магазин": "Mergeți la cumpărături",
   "{name} получит список": "{name} va primi lista",
   "Кого отправили в магазин и когда покупки сделаны": "Cine a fost trimis la magazin și când cumpărăturile sunt făcute",
+  "Покупки": "Cumpărături",
+  "С виджета добавлено: {names}": "Adăugat din widget: {names}",
 };
 
 export default ro;

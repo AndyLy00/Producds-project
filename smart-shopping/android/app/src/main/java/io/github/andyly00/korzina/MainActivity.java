@@ -36,5 +36,11 @@ public class MainActivity extends BridgeActivity {
         public void setWidget(String json) {
             ListWidgetProvider.save(getApplicationContext(), json);
         }
+
+        /** Products added from the widget's "+" since the app last asked, as a JSON array (src/device.ts). */
+        @JavascriptInterface
+        public String takeWidgetAdditions() {
+            return ListWidgetProvider.takePending(getApplicationContext());
+        }
     }
 }

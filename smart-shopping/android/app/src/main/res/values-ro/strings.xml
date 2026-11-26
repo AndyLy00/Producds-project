@@ -4,4 +4,11 @@
     <string name="title_activity_main">Korzina</string>
     <string name="widget_description">Ce a mai rămas de cumpărat în prima listă</string>
     <string name="widget_empty">Deschideți aplicația pentru a afișa o listă</string>
+    <string name="quick_add_title">Adăugați în „%1$s”</string>
+    <string name="quick_add_title_new">Adăugați în lista de cumpărături</string>
+    <string name="quick_add_hint">De exemplu: lapte 2 l, pâine</string>
+    <string name="quick_add_note">Mai multe produse — separate prin virgulă. Ajung în listă când deschideți aplicația.</string>
+    <string name="quick_add_button">Adăugați</string>
+    <string name="quick_add_cancel">Anulați</string>
+    <string name="widget_add">Adăugați un produs</string>
 </resources>

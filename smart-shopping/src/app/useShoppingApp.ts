@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useKeyboard } from "../mobile";
 import { useCloudSync, type FamilyInvite, type Member } from "../cloud-sync";
 import { startPush } from "../push";
-import { allowBrowserNotifications, allowReminders, notifyNow, exactAlarmsAllowed, isNativeApp, onNotificationOpened, openExactAlarmSettings, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
+import { allowBrowserNotifications, allowReminders, notifyNow, takeWidgetAdditions, exactAlarmsAllowed, isNativeApp, onNotificationOpened, openExactAlarmSettings, renderGoogleButton, scheduleReminders, shareText, updateWidget } from "../device";
 import { forgetPhotosExcept, newPhotoId, savePhoto, shrinkPhoto } from "../photos";
 import {
   addProducts,
@@ -14,6 +14,7 @@ import {
   createId,
   emptyData,
   formatReminder,
+  addWidgetProducts,
   formatRepeat,
   personName,
   stampNewItems,
@@ -102,6 +103,8 @@ export function useShoppingApp() {
   const cloud = useCloudSync(data, setData, ready, notify);
   // The signed-in account, lower-case as the server keeps it; null without an account.
   const me = cloud.email?.toLowerCase() ?? null;
+  const meRef = useRef(me);
+  meRef.current = me;
   const cloudRef = useRef(cloud);
   cloudRef.current = cloud;
   const timers = useTimers((timer) => setToast({ text: t("Готово: {label}", { label: timer.label }) }));
@@ -189,6 +192,31 @@ export function useShoppingApp() {
       void notifyNow(entry.key, entry.title, entry.body, entry.listId);
     }
   }, [ready, me, data.lists, notify]);
+
+  // Products added with the widget's "+" while the app was closed (src/device.ts): taken in when
+  // the app starts and each time it comes back to the front.
+  useEffect(() => {
+    if (!ready) return;
+    const takeIn = () => {
+      if (document.visibilityState !== "visible") return;
+      const additions = takeWidgetAdditions();
+      if (!additions.length) return;
+      const { added } = addWidgetProducts(dataRef.current, additions, categoryNames(dataRef.current), t("Покупки"));
+      if (!added.length) return;
+      change((previous) => {
+        const result = addWidgetProducts(previous, additions, categoryNames(previous), t("Покупки"));
+        const stamped = result.data.lists.map((list) => {
+          const before = previous.lists.find((entry) => entry.id === list.id);
+          return before ? stampNewItems(before, list, meRef.current) : stampNewItems({ ...list, items: [] }, list, meRef.current);
+        });
+        return { ...result.data, lists: stamped };
+      });
+      notify(t("С виджета добавлено: {names}", { names: added.join(", ") }));
+    };
+    takeIn();
+    document.addEventListener("visibilitychange", takeIn);
+    return () => document.removeEventListener("visibilitychange", takeIn);
+  }, [ready]);
 
   // Reminders and the home-screen widget follow the data.
   const reminderKey = JSON.stringify(activeLists.map((list) => [list.id, list.remindAt, list.repeat, list.name, progress(list).left]));

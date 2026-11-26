@@ -3,7 +3,7 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
-import { alive, progress, repeatTimes, type ShoppingList } from "./model";
+import { alive, progress, repeatTimes, type ShoppingList, type WidgetAddition } from "./model";
 import { t } from "./i18n";
 import { pushActive } from "./push";
 
@@ -242,7 +242,7 @@ export function allowBrowserNotifications() {
 
 // --- Android widget ----------------------------------------------------------------------------
 
-type AppWindowBridge = { setWidget?: (json: string) => void };
+type AppWindowBridge = { setWidget?: (json: string) => void; takeWidgetAdditions?: () => string };
 
 // Shows the list on the home-screen widget (ListWidgetProvider.java).
 export function updateWidget(list: ShoppingList | undefined) {
@@ -251,11 +251,27 @@ export function updateWidget(list: ShoppingList | undefined) {
   const items = list ? alive(list.items).filter((item) => !item.purchased) : [];
   bridge.setWidget(
     JSON.stringify({
+      // The widget's "+" adds to this list (android QuickAddActivity.java).
+      listId: list?.id ?? "",
       title: list?.name ?? t("Корзина"),
       subtitle: list ? (items.length ? t("Осталось купить: {length}", { length: items.length }) : t("Всё куплено")) : t("Нет списков"),
       items: items.slice(0, 12).map((item) => `${item.name} — ${item.quantity} ${item.unit}`),
     }),
   );
+}
+
+// Products added with the widget's "+" while the app was closed; the queue is emptied.
+export function takeWidgetAdditions(): WidgetAddition[] {
+  const bridge = (window as { AppWindow?: AppWindowBridge }).AppWindow;
+  if (!bridge?.takeWidgetAdditions) return [];
+  try {
+    const value: unknown = JSON.parse(bridge.takeWidgetAdditions());
+    return Array.isArray(value)
+      ? value.filter((entry): entry is WidgetAddition => Boolean(entry) && typeof entry.text === "string" && typeof entry.listId === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 // --- Google Identity Services (web) ------------------------------------------------------------

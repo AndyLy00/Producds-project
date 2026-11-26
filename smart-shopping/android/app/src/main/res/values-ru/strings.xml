@@ -4,4 +4,11 @@
     <string name="title_activity_main">Корзина</string>
     <string name="widget_description">Что осталось купить в первом списке</string>
     <string name="widget_empty">Откройте приложение, чтобы показать список</string>
+    <string name="quick_add_title">Добавить в «%1$s»</string>
+    <string name="quick_add_title_new">Добавить в список покупок</string>
+    <string name="quick_add_hint">Например: молоко 2 л, хлеб</string>
+    <string name="quick_add_note">Несколько продуктов — через запятую. Они попадут в список, когда вы откроете приложение.</string>
+    <string name="quick_add_button">Добавить</string>
+    <string name="quick_add_cancel">Отмена</string>
+    <string name="widget_add">Добавить продукт</string>
 </resources>
