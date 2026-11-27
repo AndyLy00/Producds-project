@@ -488,6 +488,12 @@ const en: Record<string, string> = {
   "Кого отправили в магазин и когда покупки сделаны": "Who is sent shopping and when the shopping is done",
   "Покупки": "Shopping",
   "С виджета добавлено: {names}": "Added from the widget: {names}",
+  "Выйти из семьи?": "Leave the family?",
+  "Списки других членов семьи пропадут с этого телефона, а ваши списки они больше не увидят. Сами списки никуда не денутся.": "The other family members' lists will disappear from this phone, and they will no longer see your lists. The lists themselves are not deleted.",
+  "Вы создатель семьи — управлять ею станет следующий участник.": "You created the family — the next member will manage it.",
+  "Вернуться можно только по новому приглашению.": "You can only come back with a new invitation.",
+  "Выйти": "Leave",
+  "Остаться": "Stay",
 };
 
 export default en;

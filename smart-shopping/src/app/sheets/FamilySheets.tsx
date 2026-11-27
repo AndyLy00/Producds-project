@@ -1,5 +1,6 @@
 // Family: who is in it, inviting people, leaving; and agreeing to join from an invitation.
 import { CopyIcon, Cross2Icon, EnvelopeClosedIcon, ExitIcon, HomeIcon, Link2Icon, PersonIcon, Share1Icon } from "@radix-ui/react-icons";
+import { useState } from "react";
 import { KeyboardInput } from "../../mobile";
 import { shareText } from "../../device";
 import { Field, FormError, SheetClose, type SheetProps } from "../ui";
@@ -7,6 +8,8 @@ import { t } from "../../i18n";
 
 export function FamilySheet({ app }: SheetProps<"family">) {
   const { cloud, familyState, setFamilyState, busy, run, notify } = app;
+  // Leaving is asked about first: it takes the family's lists off this phone.
+  const [leaving, setLeaving] = useState(false);
   if (!cloud.email) {
     return (
       <div className="sheet-form">
@@ -17,6 +20,7 @@ export function FamilySheet({ app }: SheetProps<"family">) {
     );
   }
   const family = cloud.family;
+  const inFamily = Boolean(family && family.members.length > 1);
   const createLink = () => void run(async () => { const link = await cloud.familyActions.invite(); setFamilyState((previous) => ({ ...previous, link })); });
   return (
     <div className="sheet-form">
@@ -32,6 +36,19 @@ export function FamilySheet({ app }: SheetProps<"family">) {
               )}
             </div>
           ))}
+          {inFamily && !leaving && <button type="button" className="text-action family-leave" disabled={busy} onClick={() => setLeaving(true)}><ExitIcon /> {t("Выйти из семьи")}</button>}
+        </section>
+      )}
+      {inFamily && leaving && (
+        <section className="leave-confirm" role="alertdialog" aria-label={t("Выйти из семьи?")}>
+          <b>{t("Выйти из семьи?")}</b>
+          <p>{t("Списки других членов семьи пропадут с этого телефона, а ваши списки они больше не увидят. Сами списки никуда не денутся.")}</p>
+          {family?.owner && <p>{t("Вы создатель семьи — управлять ею станет следующий участник.")}</p>}
+          <p>{t("Вернуться можно только по новому приглашению.")}</p>
+          <div className="sheet-actions">
+            <button type="button" className="destructive-button" disabled={busy} onClick={() => { setLeaving(false); app.leaveFamily(); }}><ExitIcon /> {busy ? t("Подождите…") : t("Выйти")}</button>
+            <button type="button" className="secondary-button" disabled={busy} onClick={() => setLeaving(false)}>{t("Остаться")}</button>
+          </div>
         </section>
       )}
       {familyState.link ? (
@@ -53,7 +70,6 @@ export function FamilySheet({ app }: SheetProps<"family">) {
         </form>
       )}
       <FormError app={app} />
-      {family && family.members.length > 1 && <button type="button" className="destructive-button" disabled={busy} onClick={app.leaveFamily}><ExitIcon /> {t("Выйти из семьи")}</button>}
     </div>
   );
 }

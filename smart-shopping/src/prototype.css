@@ -235,6 +235,11 @@
 .create-list-button small { color: var(--muted); font-size: 10px; }
 .create-list-button > svg { width: 15px; height: 15px; color: var(--muted); }
 .home-tip { display: flex; align-items: flex-start; gap: 9px; margin-top: 21px; padding: 13px; border-radius: 14px; background: var(--green-soft); }
+.family-leave { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; margin-top: 2px; color: var(--tomato); }
+.family-leave svg { width: 14px; height: 14px; }
+.leave-confirm { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--tomato) 35%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--tomato) 7%, transparent); color: var(--ink); }
+.leave-confirm b { font-size: 14px; }
+.leave-confirm p { margin: 0; font-size: 12px; line-height: 1.45; }
 .shopper-note { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 12px 13px; border-radius: 14px; background: var(--green-soft); color: var(--ink); }
 .shopper-note svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--green); }
 .shopper-note p { margin: 0; font-size: 12px; line-height: 1.45; }

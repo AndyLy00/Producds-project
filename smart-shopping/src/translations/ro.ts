@@ -488,6 +488,12 @@ const ro: Record<string, string> = {
   "Кого отправили в магазин и когда покупки сделаны": "Cine a fost trimis la magazin și când cumpărăturile sunt făcute",
   "Покупки": "Cumpărături",
   "С виджета добавлено: {names}": "Adăugat din widget: {names}",
+  "Выйти из семьи?": "Ieșiți din familie?",
+  "Списки других членов семьи пропадут с этого телефона, а ваши списки они больше не увидят. Сами списки никуда не денутся.": "Listele celorlalți membri ai familiei vor dispărea de pe acest telefon, iar ei nu vă vor mai vedea listele. Listele în sine nu se șterg.",
+  "Вы создатель семьи — управлять ею станет следующий участник.": "Dvs. ați creat familia — o va administra următorul membru.",
+  "Вернуться можно только по новому приглашению.": "Vă puteți întoarce doar cu o invitație nouă.",
+  "Выйти": "Ieșiți",
+  "Остаться": "Rămâneți",
 };
 
 export default ro;
