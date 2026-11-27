@@ -1,6 +1,6 @@
 // Small building blocks shared by the screens and sheets.
 import { BackpackIcon, BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIcon, PersonIcon, PlusIcon, StarFilledIcon, StarIcon, UpdateIcon } from "@radix-ui/react-icons";
-import { useState, type PointerEvent, type ReactNode } from "react";
+import { memo, useState, type PointerEvent, type ReactNode } from "react";
 import { formatReminder, nextReminder, personName, productImage, type ShoppingItem, type ShoppingList } from "../model";
 import { usePhoto } from "../photos";
 import { formatLei } from "./usePrices";
@@ -14,17 +14,20 @@ export type SheetProps<K extends Sheet["kind"]> = { app: ShoppingApp; sheet: She
 
 // `cost`: what the item would cost at Linella, in bani (src/app/usePrices.ts).
 // `who`: who of the family added or bought the item, when it is worth saying (src/app/ListScreen.tsx).
-export function ProductRow({ item, handle, onToggle, onEdit, onFavorite, cost, who }: { item: ShoppingItem; handle?: DragHandle; onToggle: () => void; onEdit: () => void; onFavorite: () => void; cost?: number; who?: string }) {
+// Memoized: a long list does not redraw every row on each keystroke elsewhere on the screen. The
+// handlers get the item back and must stay the same between renders; `lang` redraws the row's
+// texts when the language changes.
+export const ProductRow = memo(function ProductRow({ item, handle, onToggle, onEdit, onFavorite, cost, who }: { item: ShoppingItem; handle?: DragHandle; onToggle: (item: ShoppingItem) => void; onEdit: (item: ShoppingItem) => void; onFavorite: (item: ShoppingItem) => void; cost?: number; who?: string; lang: string }) {
   const image = productImage(item.name);
   return <div className={`product-row ${item.purchased ? "product-row-done" : ""}`}>
     {handle && <span className="drag-handle" aria-label={t("Перетащить {name}", { name: item.name })} {...handle}><DragHandleDots2Icon /></span>}
-    <button className={`check-button ${item.purchased ? "checked" : ""}`} onClick={onToggle} aria-label={item.purchased ? t("Вернуть {name} в список", { name: item.name }) : t("Отметить {name} купленным", { name: item.name })}>{item.purchased && <CheckIcon />}</button>
+    <button className={`check-button ${item.purchased ? "checked" : ""}`} onClick={() => onToggle(item)} aria-label={item.purchased ? t("Вернуть {name} в список", { name: item.name }) : t("Отметить {name} купленным", { name: item.name })}>{item.purchased && <CheckIcon />}</button>
     {image ? <img className="product-art" src={image} alt="" /> : <span className="product-art product-art-placeholder" aria-hidden="true">{item.name.slice(0, 1).toLocaleUpperCase("ru")}</span>}
-    <button className="product-main" onClick={onEdit}><span className="product-name">{item.name}</span><small className="product-note">{[t(item.category), item.note].filter(Boolean).join(" · ")}</small>{who && <small className="product-who">{who}</small>}</button>
+    <button className="product-main" onClick={() => onEdit(item)}><span className="product-name">{item.name}</span><small className="product-note">{[t(item.category), item.note].filter(Boolean).join(" · ")}</small>{who && <small className="product-who">{who}</small>}</button>
     <span className="product-quantity">{item.quantity} {t(item.unit)}{cost !== undefined && <small className="product-price">≈ {formatLei(cost)}</small>}</span>
-    <button className={`favorite-button ${item.favorite ? "favorite-active" : ""}`} onClick={onFavorite} aria-label={item.favorite ? t("Убрать из избранного") : t("В избранное")}>{item.favorite ? <StarFilledIcon /> : <StarIcon />}</button>
+    <button className={`favorite-button ${item.favorite ? "favorite-active" : ""}`} onClick={() => onFavorite(item)} aria-label={item.favorite ? t("Убрать из избранного") : t("В избранное")}>{item.favorite ? <StarFilledIcon /> : <StarIcon />}</button>
   </div>;
-}
+});
 
 export function NavButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return <button className={`nav-button ${active ? "nav-active" : ""}`} onClick={onClick} aria-current={active ? "page" : undefined}><span>{icon}</span><small>{label}</small></button>;

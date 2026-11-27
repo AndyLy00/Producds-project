@@ -519,3 +519,47 @@
 
 /* Room for the Android app's ad banner above the navigation (src/ads.ts). */
 .home-screen .bottom-spacer { height: calc(20px + var(--ad-height, 0px)); }
+
+/* --- Motion --------------------------------------------------------------------------------
+   Short feedback on taps and gentle entrances. Only transform and opacity are animated, which
+   phones draw without recomputing the layout; nothing runs for people whose system asks for
+   reduced motion. Entrances use fill-mode "backwards" so that, once over, they leave the
+   element alone (its :active press still works). */
+@media (prefers-reduced-motion: no-preference) {
+  /* Pressing buttons. */
+  .primary-button, .secondary-button, .destructive-button, .chip-button, .sort-chip, .icon-button, .back-button, .text-action {
+    transition: transform 120ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+  .primary-button:active, .secondary-button:active, .destructive-button:active, .chip-button:active, .sort-chip:active, .text-action:active { transform: scale(0.97); }
+  .icon-button:active, .back-button:active { transform: scale(0.92); }
+  .primary-button:disabled, .secondary-button:disabled, .destructive-button:disabled { transform: none; }
+
+  /* Ticking a product and starring it. */
+  .check-button { transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease; }
+  .check-button:active { transform: scale(0.86); }
+  .check-button.checked svg { animation: pop-in 240ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+  .favorite-button { transition: color 160ms ease, transform 120ms ease; }
+  .favorite-button:active { transform: scale(0.82); }
+  .favorite-button.favorite-active svg { animation: pop-in 280ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+  .product-name { transition: color 200ms ease; }
+  .product-art { transition: opacity 200ms ease; }
+
+  /* Bottom navigation. */
+  .nav-button > span { transition: background-color 180ms ease, transform 120ms ease; }
+  .nav-button:active > span { transform: scale(0.9); }
+
+  /* List cards rise in one after another when the home screen opens. */
+  .list-card { animation: rise-in 260ms ease-out backwards; }
+  .list-card:nth-child(2) { animation-delay: 35ms; }
+  .list-card:nth-child(3) { animation-delay: 70ms; }
+  .list-card:nth-child(4) { animation-delay: 105ms; }
+  .list-card:nth-child(n + 5) { animation-delay: 140ms; }
+
+  /* Notes that appear inside a screen. */
+  .shopper-note, .leave-confirm, .empty-state { animation: rise-in 220ms ease-out backwards; }
+  .purchased-list { animation: fade-in 180ms ease-out backwards; }
+}
+
+@keyframes pop-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }

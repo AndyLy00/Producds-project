@@ -1,5 +1,6 @@
 // One open shopping list: products to buy, bought products and the quick-add bar.
 import { ArchiveIcon, ArrowLeftIcon, BackpackIcon, CheckIcon, ChevronDownIcon, DotsHorizontalIcon, MagnifyingGlassIcon, Pencil1Icon, PlusIcon, Share1Icon, TrashIcon } from "@radix-ui/react-icons";
+import { useMemo, useRef } from "react";
 import { KeyboardInput, MobileScroll } from "../mobile";
 import { alive, personName, progress, sortItems, type ShoppingItem, type ShoppingList } from "../model";
 import { Sortable, type DragHandle } from "../sortable";
@@ -33,15 +34,26 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
   };
   const shopper = list.shopper;
 
+  // Row handlers read the app at the moment of the tap, so they stay the same between renders
+  // and a row redraws only when its own product changes (ProductRow is memoized).
+  const latest = useRef({ app, listId: list.id });
+  latest.current = { app, listId: list.id };
+  const rowActions = useMemo(() => ({
+    toggle: (item: ShoppingItem) => latest.current.app.togglePurchased(latest.current.listId, item),
+    edit: (item: ShoppingItem) => latest.current.app.openProductSheet(item),
+    favorite: (item: ShoppingItem) => latest.current.app.patchItem(latest.current.listId, item.id, { favorite: !item.favorite }),
+  }), []);
+
   const productRow = (item: ShoppingItem, handle?: DragHandle) => (
     <ProductRow
       item={item}
       handle={handle}
-      onToggle={() => app.togglePurchased(list.id, item)}
-      onEdit={() => app.openProductSheet(item)}
-      onFavorite={() => app.patchItem(list.id, item.id, { favorite: !item.favorite })}
+      onToggle={rowActions.toggle}
+      onEdit={rowActions.edit}
+      onFavorite={rowActions.favorite}
       cost={costs.get(item.id)}
       who={together ? whoOf(item) : undefined}
+      lang={app.lang}
     />
   );
 
