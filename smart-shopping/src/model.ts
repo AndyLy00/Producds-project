@@ -187,6 +187,21 @@ const productImages: Record<string, string> = {
   "помидоры": "tomatoes", "tomatoes": "tomatoes", "roșii": "tomatoes", "rosii": "tomatoes",
   "сыр": "cheese", "cheese": "cheese", "brânză": "cheese", "branza": "cheese",
   "кофе": "coffee", "coffee": "coffee", "cafea": "coffee",
+  "бананы": "bananas", "банан": "bananas", "bananas": "bananas", "banana": "bananas", "banane": "bananas",
+  "лук": "onions", "репчатый лук": "onions", "onions": "onions", "onion": "onions", "ceapă": "onions", "ceapa": "onions",
+  "капуста": "cabbage", "cabbage": "cabbage", "varză": "cabbage", "varza": "cabbage",
+  "картофель": "potatoes", "картошка": "potatoes", "potatoes": "potatoes", "potato": "potatoes", "cartofi": "potatoes",
+  "морковь": "carrots", "морковка": "carrots", "carrots": "carrots", "carrot": "carrots", "morcovi": "carrots",
+  "огурцы": "cucumbers", "огурец": "cucumbers", "cucumbers": "cucumbers", "cucumber": "cucumbers", "castraveți": "cucumbers", "castraveti": "cucumbers",
+  "чеснок": "garlic", "garlic": "garlic", "usturoi": "garlic",
+  "курица": "chicken", "куриные ножки": "chicken", "куриные голени": "chicken", "chicken": "chicken", "pui": "chicken",
+  // Not plain "перец": that is also black pepper.
+  "болгарский перец": "peppers", "перец болгарский": "peppers", "сладкий перец": "peppers", "bell peppers": "peppers", "bell pepper": "peppers", "peppers": "peppers", "ardei": "peppers",
+  "говядина": "beef", "мясо": "beef", "beef": "beef", "carne de vită": "beef", "carne de vita": "beef", "vită": "beef", "vita": "beef",
+  "апельсины": "oranges", "апельсин": "oranges", "oranges": "oranges", "orange": "oranges", "portocale": "oranges",
+  "лимоны": "lemons", "лимон": "lemons", "lemons": "lemons", "lemon": "lemons", "lămâi": "lemons", "lamai": "lemons", "lămâie": "lemons",
+  "рыба": "fish", "fish": "fish", "pește": "fish", "peste": "fish",
+  "гречка": "buckwheat", "гречневая крупа": "buckwheat", "buckwheat": "buckwheat", "hrișcă": "buckwheat", "hrisca": "buckwheat",
 };
 
 // A picture for a common product, when there is one.
