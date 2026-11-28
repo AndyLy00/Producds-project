@@ -5,7 +5,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
 import { alive, progress, repeatTimes, type ShoppingList, type WidgetAddition } from "./model";
 import { t } from "./i18n";
-import { pushActive } from "./push";
+import { pushActive, savedPushToken } from "./push";
 
 export const isNativeApp = Capacitor.isNativePlatform();
 
@@ -63,13 +63,16 @@ export async function scheduleReminders(lists: ShoppingList[]) {
     if (pending.length) await LocalNotifications.cancel({ notifications: pending.map(({ id }) => ({ id })) });
     const now = Date.now();
     const notifications = lists
-      .filter((list) => !list.deleted && !list.completedAt)
+      // A completed list reminds only of its repeating reminder (src/app/useShoppingApp.ts).
+      .filter((list) => !list.deleted && (!list.completedAt || list.repeat))
       .flatMap((list) => {
-        const body = progress(list).left ? t("{name}: осталось купить {left}", { name: list.name, left: progress(list).left }) : list.name;
+        const body = list.completedAt
+          ? t("Пора повторить список «{name}»", { name: list.name })
+          : progress(list).left ? t("{name}: осталось купить {left}", { name: list.name, left: progress(list).left }) : list.name;
         // A repeating reminder is scheduled as its next occurrences; the app schedules more each
         // time it is opened.
         const times = [
-          ...(list.remindAt && list.remindAt > now ? [{ key: list.id, at: list.remindAt }] : []),
+          ...(!list.completedAt && list.remindAt && list.remindAt > now ? [{ key: list.id, at: list.remindAt }] : []),
           ...(list.repeat ? repeatTimes(list.repeat, REPEATS_AHEAD, now).map((at) => ({ key: `${list.id}:${at}`, at })) : []),
         ];
         return times.map(({ key, at }) => ({
@@ -211,8 +214,9 @@ const NEWS_IDS = 2_110_000_000;
 // A notification right away, for news that came with a sync while the app is in the background;
 // in front of the user the app shows it itself.
 export async function notifyNow(key: string, title: string, body: string, listId: string) {
-  // The server has sent it by push already (src/push.ts).
-  if (document.visibilityState === "visible" || pushActive()) return;
+  // The server has sent it by push already (src/push.ts): a phone that got a push token once
+  // gets the news by push, also right after a restart before the token is confirmed again.
+  if (document.visibilityState === "visible" || pushActive() || savedPushToken()) return;
   if (!isNativeApp) {
     if ("Notification" in window && Notification.permission === "granted") {
       try {

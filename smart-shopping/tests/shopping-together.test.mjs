@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cleanList } from "../api/_clean.js";
-import { personName, stampNewItems } from "../src/model.ts";
+import { currentShopper, personName, stampNewItems } from "../src/model.ts";
 
 const item = (id, extra = {}) => ({ id, name: id, quantity: "1", unit: "шт.", category: "", note: "", purchased: false, favorite: false, order: 0, updatedAt: 1, ...extra });
 const list = (items, extra = {}) => ({ id: "l", name: "Неделя", createdAt: 1, updatedAt: 1, sortMode: "category", items, ...extra });
@@ -40,4 +40,13 @@ test("the server keeps who goes to the store, who added and who bought", () => {
   assert.equal(cleaned.completedBy, "anna@example.com");
   assert.equal(cleanList(list([], { shopper: { email: "anna@example.com" } })).shopper, undefined);
   assert.equal(cleanList(list([], { completedBy: "anna@example.com" })).completedBy, undefined);
+});
+
+test("the shopper shows only while the list is to buy and they are still in the family", () => {
+  const shopper = { email: "anna@example.com", by: "ion@example.com", at: 5 };
+  const family = ["anna@example.com", "ion@example.com"];
+  assert.deepEqual(currentShopper(list([], { shopper }), family), shopper);
+  assert.equal(currentShopper(list([], { shopper }), ["ion@example.com"]), undefined);
+  assert.equal(currentShopper(list([], { shopper }), []), undefined);
+  assert.equal(currentShopper(list([], { shopper, completedAt: 9 }), family), undefined);
 });

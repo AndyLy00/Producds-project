@@ -1,7 +1,7 @@
 // Small building blocks shared by the screens and sheets.
 import { BackpackIcon, BellIcon, CheckIcon, Cross2Icon, DragHandleDots2Icon, HeartIcon, MixIcon, PersonIcon, PlusIcon, StarFilledIcon, StarIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { memo, useState, type PointerEvent, type ReactNode } from "react";
-import { formatReminder, nextReminder, personName, productImage, type ShoppingItem, type ShoppingList } from "../model";
+import { currentShopper, formatReminder, nextReminder, personName, productImage, type ShoppingItem, type ShoppingList } from "../model";
 import { usePhoto } from "../photos";
 import { formatLei } from "./usePrices";
 import type { DragHandle } from "../sortable";
@@ -45,7 +45,7 @@ export function ListBadges({ app, list }: { app: ShoppingApp; list: ShoppingList
   const next = nextReminder(list);
   const shown = next ?? (list.remindAt && !list.completedAt ? list.remindAt : undefined);
   // Who goes to the store; only while the list is still to be bought.
-  const shopper = list.shopper && !list.completedAt ? list.shopper.email : undefined;
+  const shopper = currentShopper(list, app.familyEmails)?.email;
   const mine = shopper !== undefined && shopper === app.cloud.email?.toLowerCase();
   if (!sharing && !store && !shown && !shopper) return null;
   return (

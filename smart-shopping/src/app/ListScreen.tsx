@@ -2,7 +2,7 @@
 import { ArchiveIcon, ArrowLeftIcon, BackpackIcon, CheckIcon, ChevronDownIcon, DotsHorizontalIcon, MagnifyingGlassIcon, Pencil1Icon, PlusIcon, Share1Icon, TrashIcon } from "@radix-ui/react-icons";
 import { useMemo, useRef } from "react";
 import { KeyboardInput, MobileScroll } from "../mobile";
-import { alive, personName, progress, sortItems, type ShoppingItem, type ShoppingList } from "../model";
+import { alive, currentShopper, personName, progress, sortItems, type ShoppingItem, type ShoppingList } from "../model";
 import { Sortable, type DragHandle } from "../sortable";
 import { ListBadges, ProductRow } from "./ui";
 import { formatLei, itemCost, usePrices } from "./usePrices";
@@ -32,7 +32,7 @@ export function ListScreen({ app, list }: { app: ShoppingApp; list: ShoppingList
     if (!item.purchased && item.addedBy && item.addedBy !== me) return t("добавил(а) {name}", { name: personName(item.addedBy) });
     return undefined;
   };
-  const shopper = list.shopper;
+  const shopper = currentShopper(list, app.familyEmails);
 
   // Row handlers read the app at the moment of the tap, so they stay the same between renders
   // and a row redraws only when its own product changes (ProductRow is memoized).

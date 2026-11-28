@@ -24,7 +24,7 @@ import {
 import { useState, type ReactNode } from "react";
 import { KeyboardInput } from "../../mobile";
 import { shareText } from "../../device";
-import { addProducts, alive, formatReminder, formatRepeat, guessCategory, newList, personName, progress, units, weekdayName, weekdays, type Repeat, type Template } from "../../model";
+import { addProducts, alive, currentShopper, formatReminder, formatRepeat, guessCategory, newList, personName, progress, units, weekdayName, weekdays, type Repeat, type Template } from "../../model";
 import { at, nextWeekday, toLocalInput } from "../types";
 import { Field, FormError, keepFocus, SheetClose, type SheetProps as Props } from "../ui";
 import { formatLei, usePrices } from "../usePrices";
@@ -104,7 +104,7 @@ export function ListActionsSheet({ app }: Props<"actions">) {
         </button>
       )}
       {action(<Share1Icon />, t("Отправить текстом"), () => void app.sendAsText(list), t("В мессенджер или заметки"))}
-      {inFamily && !list.personal && action(<BackpackIcon />, t("Кто идёт в магазин"), () => app.openSheet({ kind: "shopper", listId: list.id }), list.shopper ? personLabel(app, list.shopper.email) : t("Отправить кого-то со списком"))}
+      {inFamily && !list.personal && action(<BackpackIcon />, t("Кто идёт в магазин"), () => app.openSheet({ kind: "shopper", listId: list.id }), currentShopper(list, app.familyEmails) ? personLabel(app, currentShopper(list, app.familyEmails)!.email) : t("Отправить кого-то со списком"))}
       {action(<BellIcon />, t("Напоминание"), () => { app.setReminderValue(toLocalInput(list.remindAt ?? at(1, 10))); app.openSheet({ kind: "reminder", listId: list.id }); }, [list.remindAt && list.remindAt > Date.now() ? formatReminder(list.remindAt) : "", list.repeat ? formatRepeat(list.repeat) : ""].filter(Boolean).join(" · ") || t("Не задано"))}
       {action(<MixIcon />, t("Магазин"), () => app.openSheet({ kind: "store-pick", listId: list.id }), app.storeName(list) ?? t("Не выбран"))}
       {action(<BookmarkIcon />, t("Сохранить как шаблон"), () => app.saveAsTemplate(list))}
@@ -233,7 +233,7 @@ export function ShopperSheet({ app }: Props<"shopper">) {
   const members = app.cloud.family?.members ?? [];
   // The user first, then the others.
   const people = [...members].sort((a, b) => Number(b.you) - Number(a.you));
-  const current = list.shopper?.email;
+  const current = currentShopper(list, app.familyEmails)?.email;
   return (
     <div className="sheet-form action-list">
       <SheetClose app={app} />

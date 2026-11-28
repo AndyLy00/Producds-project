@@ -494,6 +494,10 @@ const ro: Record<string, string> = {
   "Вернуться можно только по новому приглашению.": "Vă puteți întoarce doar cu o invitație nouă.",
   "Выйти": "Ieșiți",
   "Остаться": "Rămâneți",
+  "Не напоминать о списке «{name}»": "Nu mai amintiți despre „{name}”",
+  "Список в истории. Напоминание {rule} продолжит приходить": "Lista e în istoric. Mementoul {rule} va continua să vină",
+  "«{name}» в истории — нажмите «Повторить», чтобы собрать список снова": "„{name}” e în istoric — atingeți „Repetați” pentru a face lista din nou",
+  "Пора повторить список «{name}»": "E timpul să repetați lista „{name}”",
 };
 
 export default ro;

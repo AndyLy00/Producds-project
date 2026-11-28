@@ -15,6 +15,7 @@ import {
   emptyData,
   formatReminder,
   addWidgetProducts,
+  currentShopper,
   formatRepeat,
   personName,
   stampNewItems,
@@ -159,11 +160,13 @@ export function useShoppingApp() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  // The family's addresses, lower-case; empty without a family.
+  const familyEmails = useMemo(() => (cloud.family && cloud.family.members.length > 1 ? cloud.family.members.map((member) => member.email.toLowerCase()) : []), [cloud.family]);
   // A list the user has been sent to the store with comes first.
   const activeLists = useMemo(() => {
-    const mine = (list: ShoppingList) => (list.shopper?.email === me ? 1 : 0);
+    const mine = (list: ShoppingList) => (me && currentShopper(list, familyEmails)?.email === me ? 1 : 0);
     return alive(data.lists).filter((list) => !list.completedAt).sort((a, b) => mine(b) - mine(a) || b.createdAt - a.createdAt);
-  }, [data.lists, me]);
+  }, [data.lists, me, familyEmails]);
   const history = useMemo(() => alive(data.lists).filter((list) => list.completedAt).sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)), [data.lists]);
   const categories = categoryNames(data);
   const currentList = activeLists.find((list) => list.id === currentListId) ?? null;
@@ -219,9 +222,12 @@ export function useShoppingApp() {
   }, [ready]);
 
   // Reminders and the home-screen widget follow the data.
-  const reminderKey = JSON.stringify(activeLists.map((list) => [list.id, list.remindAt, list.repeat, list.name, progress(list).left]));
+  // A completed list keeps its repeating reminder: "every Saturday" is about the trip to the
+  // store, not about this copy of the list (it moves to the next copy on "Repeat").
+  const remindedLists = useMemo(() => alive(data.lists).filter((list) => !list.completedAt || list.repeat), [data.lists]);
+  const reminderKey = JSON.stringify(remindedLists.map((list) => [list.id, list.remindAt, list.repeat, list.completedAt, list.name, progress(list).left]));
   useEffect(() => {
-    if (ready) void scheduleReminders(activeLists);
+    if (ready) void scheduleReminders(remindedLists);
   }, [ready, reminderKey]);
   useEffect(() => {
     if (ready) updateWidget(activeLists[0]);
@@ -231,12 +237,12 @@ export function useShoppingApp() {
     if (!ready || !me) return;
     void startPush(
       (token) => cloudRef.current.account.registerPush(token),
-      (listId) => { setSheet(null); setCooking(null); setTab("lists"); setCurrentListId(listId); },
+      (listId) => openFromNotification(listId),
     );
   }, [ready, me]);
 
   useEffect(() => onNotificationOpened(
-    (listId) => { setSheet(null); setCooking(null); setTab("lists"); setCurrentListId(listId); },
+    (listId) => openFromNotification(listId),
     (recipeId, stepId) => {
       const recipe = dataRef.current.recipes.find((entry) => entry.id === recipeId && !entry.deleted);
       if (!recipe) return;
@@ -461,7 +467,8 @@ export function useShoppingApp() {
   function completeList(list: ShoppingList) {
     setSheet(null);
     setCurrentListId(null);
-    undoable(t("Список перемещён в историю"), (previous) => ({
+    const text = list.repeat ? t("Список в истории. Напоминание {rule} продолжит приходить", { rule: formatRepeat(list.repeat) }) : t("Список перемещён в историю");
+    undoable(text, (previous) => ({
       ...previous,
       lists: previous.lists.map((entry) => (entry.id === list.id ? { ...entry, completedAt: Date.now(), ...(me ? { completedBy: me } : {}), remindAt: undefined, updatedAt: Date.now() } : entry)),
     }));
@@ -469,7 +476,24 @@ export function useShoppingApp() {
 
   function repeatList(list: ShoppingList) {
     // The new list takes over the repeating reminder: the completed one no longer reminds.
+    if (list.repeat) patchList(list.id, { repeat: undefined });
     addList(addProducts({ ...newList(list.name), ...(list.repeat ? { repeat: list.repeat } : {}) }, alive(list.items).map(toProduct)));
+  }
+
+  // A tapped notification about a list: an open list is shown; a completed one is in the
+  // history, where "Repeat" brings it back.
+  function openFromNotification(listId: string) {
+    setSheet(null);
+    setCooking(null);
+    const list = dataRef.current.lists.find((entry) => entry.id === listId && !entry.deleted);
+    if (list?.completedAt) {
+      setCurrentListId(null);
+      setTab("history");
+      notify(t("«{name}» в истории — нажмите «Повторить», чтобы собрать список снова", { name: list.name }));
+      return;
+    }
+    setTab("lists");
+    setCurrentListId(listId);
   }
 
   function saveAsTemplate(list: ShoppingList) {
@@ -894,7 +918,7 @@ export function useShoppingApp() {
     openRecipe, saveRecipe, editStep, addStep, removeStep, moveStep, pickRecipePhoto, removeRecipePhoto,
     startCooking, goToStep, stopCooking, startStepTimer, allowExactAlarms,
     openStore, saveStore, openCategories, addCategory, setReminder, setRepeat,
-    lang, changeLanguage,
+    lang, changeLanguage, familyEmails,
     openFamily, joinFamily, leaveFamily, togglePersonal,
     openAccount, run, submitAccount, openPasswordSheet, openDeleteAccount, startVerification, signOut, openShare,
   };

@@ -284,6 +284,11 @@
 .history-row small { color: var(--muted); font-size: 10px; }
 .favorite-row > svg { width: 17px; height: 17px; color: var(--green); }
 .history-repeat { padding: 6px 9px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.history-reminder { display: inline-flex; align-items: center; gap: 4px; color: var(--green) !important; font-weight: 650; }
+.history-reminder svg { width: 10px; height: 10px; }
+.history-stop { display: inline-flex; height: 30px; flex: 0 0 auto; align-items: center; gap: 1px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); }
+.history-stop svg { width: 12px; height: 12px; }
+.history-stop svg + svg { width: 10px; height: 10px; }
 
 .settings-group { margin: 0 0 21px; }
 .settings-label { margin: 0 0 8px 5px; color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: 1.1px; }

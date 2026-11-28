@@ -1,9 +1,9 @@
 // The tabs shown when no list is open: lists, favorites, recipes, history and settings.
-import { ArchiveIcon, BackpackIcon, CalendarIcon, ChevronRightIcon, ClockIcon, DotsHorizontalIcon, GearIcon, HomeIcon, PlayIcon, PlusIcon, ReaderIcon, StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
+import { ArchiveIcon, BackpackIcon, BellIcon, CalendarIcon, ChevronRightIcon, ClockIcon, Cross2Icon, DotsHorizontalIcon, GearIcon, HomeIcon, PlayIcon, PlusIcon, ReaderIcon, StarFilledIcon, StarIcon, UpdateIcon } from "@radix-ui/react-icons";
 import type { CSSProperties } from "react";
 import { useAdBanner } from "../ads";
 import { MobileScroll } from "../mobile";
-import { alive, formatMinutes, progress, stepsOf, toProduct, totalMinutes } from "../model";
+import { alive, formatMinutes, formatRepeat, progress, stepsOf, toProduct, totalMinutes } from "../model";
 import { SettingsTab } from "./SettingsTab";
 import { EmptyState, ListBadges, NavButton, RecipePhoto } from "./ui";
 import type { ShoppingApp } from "./useShoppingApp";
@@ -77,9 +77,21 @@ function RecipesTab({ app }: { app: ShoppingApp }) {
 function HistoryTab({ app }: { app: ShoppingApp }) {
   return <>
     <section className="welcome-block compact-welcome"><p className="eyebrow">{t("ЗАВЕРШЁННЫЕ ПОКУПКИ")}</p><h1>{t("История")}</h1><p className="welcome-subtitle">{t("Списки, которые вы завершили.")}</p></section>
-    {app.history.length ? <div className="history-list">{app.history.map((list) => (
-      <button key={list.id} className="history-row" onClick={() => app.repeatList(list)}><span className="history-icon"><ClockIcon /></span><span><b>{list.name}</b><small>{t("Продуктов: {count}", { count: alive(list.items).length })} · {new Date(list.completedAt ?? list.updatedAt).toLocaleDateString(locale())}</small></span><span className="history-repeat">{t("Повторить")}</span></button>
-    ))}</div> : <EmptyState title={t("История пока пуста")} text={t("Завершите список покупок, чтобы он появился здесь.")} />}
+    {app.history.length ? <div className="history-list">{app.history.map((list) => {
+      const details = `${t("Продуктов: {count}", { count: alive(list.items).length })} · ${new Date(list.completedAt ?? list.updatedAt).toLocaleDateString(locale())}`;
+      // A list with a repeating reminder keeps reminding from the history (src/app/useShoppingApp.ts);
+      // the reminder can be stopped here.
+      if (list.repeat) {
+        return (
+          <div key={list.id} className="history-row recipe-row">
+            <button className="favorite-row-main" onClick={() => app.repeatList(list)}><span className="history-icon"><ClockIcon /></span><span><b>{list.name}</b><small>{details}</small><small className="history-reminder"><UpdateIcon /> {formatRepeat(list.repeat)}</small></span></button>
+            <button className="history-stop" aria-label={t("Не напоминать о списке «{name}»", { name: list.name })} onClick={() => app.setRepeat(list.id, undefined)}><BellIcon /><Cross2Icon /></button>
+            <button className="history-repeat" onClick={() => app.repeatList(list)}>{t("Повторить")}</button>
+          </div>
+        );
+      }
+      return <button key={list.id} className="history-row" onClick={() => app.repeatList(list)}><span className="history-icon"><ClockIcon /></span><span><b>{list.name}</b><small>{details}</small></span><span className="history-repeat">{t("Повторить")}</span></button>;
+    })}</div> : <EmptyState title={t("История пока пуста")} text={t("Завершите список покупок, чтобы он появился здесь.")} />}
   </>;
 }
 

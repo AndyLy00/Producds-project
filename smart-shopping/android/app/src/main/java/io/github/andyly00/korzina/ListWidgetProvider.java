@@ -53,6 +53,9 @@ public class ListWidgetProvider extends AppWidgetProvider {
         SharedPreferences preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
         String taken = pending(preferences).toString();
         preferences.edit().remove(PENDING).commit();
+        // The "+" lines go: what the app added comes back with its next setWidget, and an
+        // entry it could not use must not stay on the widget.
+        refresh(context);
         return taken;
     }
 
@@ -96,7 +99,8 @@ public class ListWidgetProvider extends AppWidgetProvider {
             JSONArray pending = pending(preferences);
             for (int index = 0; index < pending.length(); index++) {
                 for (String line : pending.getJSONObject(index).optString("text").split("\\s*(?:\\n|;|,\\s)\\s*")) {
-                    if (line.isEmpty()) continue;
+                    // As the app reads it: a line without a letter or digit is not a product.
+                    if (!line.matches(".*[\\p{L}\\p{N}].*")) continue;
                     if (items.length() > 0) items.append('\n');
                     items.append("+  ").append(line);
                 }

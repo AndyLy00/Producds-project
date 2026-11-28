@@ -494,6 +494,10 @@ const en: Record<string, string> = {
   "Вернуться можно только по новому приглашению.": "You can only come back with a new invitation.",
   "Выйти": "Leave",
   "Остаться": "Stay",
+  "Не напоминать о списке «{name}»": "Stop reminders about “{name}”",
+  "Список в истории. Напоминание {rule} продолжит приходить": "The list is in the history. The reminder {rule} will keep coming",
+  "«{name}» в истории — нажмите «Повторить», чтобы собрать список снова": "“{name}” is in the history — tap “Repeat” to make the list again",
+  "Пора повторить список «{name}»": "Time to repeat “{name}”",
 };
 
 export default en;

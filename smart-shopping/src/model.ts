@@ -67,6 +67,13 @@ export function personName(email: string) {
   return email.split("@")[0] || email;
 }
 
+// Who goes to the store with the list, while it matters: the list is still to buy and that person
+// is still in the family (`family`: its members' emails, lower-case; empty without a family).
+export function currentShopper(list: ShoppingList, family: string[]) {
+  const shopper = list.shopper;
+  return shopper && !list.completedAt && family.includes(shopper.email) ? shopper : undefined;
+}
+
 // A list's new products get the name of whoever added them.
 export function stampNewItems(before: ShoppingList, after: ShoppingList, email: string | null): ShoppingList {
   if (!email) return after;
